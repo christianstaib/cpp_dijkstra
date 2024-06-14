@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.15)
+project(ParallelDijkstra)
 
-project(MyProject)
+# Conan integration
+include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+conan_basic_setup()
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+add_executable(ParallelDijkstra main.cpp)
+target_link_libraries(ParallelDijkstra ${CONAN_LIBS})
 
-add_executable(main main.cpp)
