@@ -1,6 +1,7 @@
 [requires]
-nlohmann_json/3.11.3
+zlib/1.2.11
 
 [generators]
 CMakeDeps
 CMakeToolchain
+
