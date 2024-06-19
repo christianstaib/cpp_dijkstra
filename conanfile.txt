@@ -5,6 +5,3 @@ zlib/1.2.11
 CMakeDeps
 CMakeToolchain
 
-[layout]
-cmake_layout
-
