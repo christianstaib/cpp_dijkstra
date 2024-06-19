@@ -1,12 +1,11 @@
 cmake_minimum_required(VERSION 3.15)
-project(compressor C)
+project(compressor CXX)
 
-find_package(ZLIB REQUIRED)
 find_package(OpenMP REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
-add_executable(${PROJECT_NAME} src/main.c)
+add_executable(${PROJECT_NAME} src/main.cpp)
 
-target_link_libraries(${PROJECT_NAME} ZLIB::ZLIB)
-target_link_libraries(${PROJECT_NAME} PUBLIC OpenMP::OpenMP_CXX)
+target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_CXX nlohmann_json::nlohmann_json)
 
 
