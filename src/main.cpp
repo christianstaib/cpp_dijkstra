@@ -29,13 +29,14 @@ int main(int argc, char *argv[]) {
   printf("there are %d vertices\n", p2.number_of_vertices);
 
 #pragma omp parallel
-  { printf("x"); }
-  // #pragma omp for
-  //     for (int vertex = rank; vertex < p2.number_of_vertices;
-  //          vertex += num_procs) {
-  //       int32_t weight = p2.dijkstra(vertex)[123];
-  //     }
-  //   }
+  {
+#pragma omp for
+    for (int vertex = rank; vertex < p2.number_of_vertices;
+         vertex += num_procs) {
+      printf("%d", vertex);
+      // int32_t weight = p2.dijkstra(vertex)[123];
+    }
+  }
 
   MPI_Finalize();
 }
