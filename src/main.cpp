@@ -23,6 +23,7 @@ int main(int argc, char **argv) {
 
   uint32_t num_fin_vertex = 0;
 
+  printf("start\n");
 #pragma omp parallel
   {
 #pragma omp for
