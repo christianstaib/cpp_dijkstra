@@ -25,11 +25,11 @@ int main(int argc, char *argv[]) {
 
   printf("rank %d out of %d", rank, num_procs);
 
+  int vertex;
 #pragma omp parallel
   {
-#pragma omp for
-    for (int vertex = rank; vertex < p2.number_of_vertices;
-         vertex += num_procs) {
+#pragma omp for private(vertex)
+    for (vertex = rank; vertex < p2.number_of_vertices; vertex += num_procs) {
 
       if (vertex % 1000 == 0) {
         printf("%f\n", (float)vertex / (float)p2.number_of_vertices * 100.0);
