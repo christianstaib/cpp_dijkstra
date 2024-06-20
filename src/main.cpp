@@ -41,18 +41,13 @@ int main(int argc, char **argv) {
   int myrank, nproc;
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nproc);
-  printf("my rank is %d", myrank);
 
-  std::ifstream f("example.json");
-  json data = json::parse(f);
+  std::ifstream file("example.json");
+  json data = json::parse(file);
 
   auto p2 = data.template get<graph::reversibleVecGraph>();
 
-  std::cout << p2.dijkstra(123)[1270] << std::endl;
-
   uint32_t num_fin_vertex = 0;
-
-  auto start = std::chrono::high_resolution_clock::now();
 
 #pragma omp parallel
   {
