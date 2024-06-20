@@ -10,7 +10,6 @@
 int main(int argc, char *argv[]) {
   int num_procs, rank, namelen;
   char processor_name[MPI_MAX_PROCESSOR_NAME];
-  int thread_nr = 0;
 
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
@@ -33,7 +32,10 @@ int main(int argc, char *argv[]) {
 #pragma omp for
     for (int vertex = rank; vertex < p2.number_of_vertices;
          vertex += num_procs) {
-      printf("%d\n", vertex);
+
+      int thread_nr = omp_get_thread_num();
+
+      printf("%d\n t:%d, p:%d, n:%s", vertex, thread_nr, rank, processor_name);
       // int32_t weight = p2.dijkstra(vertex)[123];
     }
   }
