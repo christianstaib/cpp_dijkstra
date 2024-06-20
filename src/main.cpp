@@ -49,27 +49,27 @@ int main(int argc, char **argv) {
 
   uint32_t num_fin_vertex = 0;
 
-#pragma omp parallel
-  {
-#pragma omp for
-    for (int i = myrank; i < p2.number_of_vertices; i += nproc) {
-      printf("am at %d\n", i);
-      int x = p2.dijkstra(i)[1270];
+  // #pragma omp parallel
+  //   {
+  // #pragma omp for
+  for (int i = myrank; i < p2.number_of_vertices; i += nproc) {
+    printf("am at %d\n", i);
+    int x = p2.dijkstra(i)[1270];
 
-      // #pragma omp critical
-      //       {
-      //         num_fin_vertex += 1;
-      //
-      //         if (num_fin_vertex % 1000 == 0) {
-      //
-      //           float progress_percent =
-      //               (float)num_fin_vertex / (float)p2.number_of_vertices *
-      //               100.0;
-      //
-      //           printf("%f%%\n", progress_percent);
-      //         }
-      //       }
-    }
+    // #pragma omp critical
+    //       {
+    //         num_fin_vertex += 1;
+    //
+    //         if (num_fin_vertex % 1000 == 0) {
+    //
+    //           float progress_percent =
+    //               (float)num_fin_vertex / (float)p2.number_of_vertices *
+    //               100.0;
+    //
+    //           printf("%f%%\n", progress_percent);
+    //         }
+    //       }
+    //    }
   }
   return 0;
 }
