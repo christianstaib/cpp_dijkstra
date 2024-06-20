@@ -33,9 +33,9 @@ int main(int argc, char *argv[]) {
     for (int vertex = rank; vertex < p2.number_of_vertices;
          vertex += num_procs) {
 
-      if (vertex % 1000 == 0) {
-        printf("%f\n", (float)vertex / (float)p2.number_of_vertices * 100.0);
-      }
+      // if (vertex % 1000 == 0) {
+      printf("%f\n", (float)vertex / (float)p2.number_of_vertices * 100.0);
+      // }
 
       int thread_nr = omp_get_thread_num();
       int num_threads = omp_get_num_threads();
