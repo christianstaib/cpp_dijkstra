@@ -11,7 +11,10 @@
 using json = nlohmann::json;
 
 int main(int argc, char **argv) {
+
+  printf("1\n");
   MPI_Init(&argc, &argv);
+  printf("2\n");
   int myrank, nproc;
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nproc);
