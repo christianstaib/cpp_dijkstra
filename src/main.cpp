@@ -1,6 +1,9 @@
 // Compile with: mpicc -fopenmp hello_hybrid.c -o hello_hybrid
 
+#include "graph.hpp"
+#include <fstream>
 #include <mpi.h>
+#include <nlohmann/json.hpp>
 #include <omp.h>
 #include <stdio.h>
 
@@ -17,6 +20,12 @@ int main(int argc, char *argv[]) {
   if (rank == 0) {
     printf("There are %d processes in total\n", num_procs);
   }
+
+  printf("loading file\n");
+  std::ifstream file("example.json");
+  nlohmann::json data = nlohmann::json::parse(file);
+
+  auto p2 = data.template get<graph::reversibleVecGraph>();
 
 #pragma omp parallel default(shared) private(thread_nr)
   {
