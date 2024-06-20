@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
       int thread_nr = omp_get_thread_num();
 
       printf("%d\n t:%d, p:%d, n:%s", vertex, thread_nr, rank, processor_name);
-      // int32_t weight = p2.dijkstra(vertex)[123];
+      int32_t weight = p2.dijkstra(vertex)[123];
     }
   }
 
