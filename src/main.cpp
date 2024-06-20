@@ -1,7 +1,6 @@
 // Compile with: mpicc -fopenmp hello_hybrid.c -o hello_hybrid
 
 #include "graph.hpp"
-#include <cstdint>
 #include <fstream>
 #include <mpi.h>
 #include <nlohmann/json.hpp>
@@ -27,15 +26,16 @@ int main(int argc, char *argv[]) {
   nlohmann::json data = nlohmann::json::parse(file);
 
   auto p2 = data.template get<graph::reversibleVecGraph>();
+  printf("there are %d vertices", p2.number_of_vertices);
 
-#pragma omp parallel
-  {
-#pragma omp for
-    for (int vertex = rank; vertex < p2.number_of_vertices;
-         vertex += num_procs) {
-      int32_t weight = p2.dijkstra(vertex)[123];
-    }
-  }
+  // #pragma omp parallel
+  //   {
+  // #pragma omp for
+  //     for (int vertex = rank; vertex < p2.number_of_vertices;
+  //          vertex += num_procs) {
+  //       int32_t weight = p2.dijkstra(vertex)[123];
+  //     }
+  //   }
 
   MPI_Finalize();
 }
