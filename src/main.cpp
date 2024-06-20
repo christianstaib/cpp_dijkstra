@@ -27,7 +27,6 @@ int main(int argc, char **argv) {
   //   {
   // #pragma omp for
   for (int i = myrank; i < p2.number_of_vertices; i += nproc) {
-    printf("am at %d\n", i);
     int x = p2.dijkstra(i)[1270];
 
     // #pragma omp critical
