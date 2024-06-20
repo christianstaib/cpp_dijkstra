@@ -25,22 +25,15 @@ int main(int argc, char *argv[]) {
 
   printf("rank %d out of %d", rank, num_procs);
 
-  int vertex;
 #pragma omp parallel
   {
-#pragma omp for private(vertex)
-    for (vertex = rank; vertex < p2.number_of_vertices; vertex += num_procs) {
-
-      if (vertex % 1000 == 0) {
-        printf("%f\n", (float)vertex / (float)p2.number_of_vertices * 100.0);
-      }
+#pragma omp for
+    for (int vertex = rank; vertex < p2.number_of_vertices;
+         vertex += num_procs) {
 
       int thread_nr = omp_get_thread_num();
       int num_threads = omp_get_num_threads();
 
-      // printf("%d t:%d, p:%d, n:%s, num_threads:%d\n", vertex, thread_nr,
-      // rank,
-      //        processor_name, num_threads);
       int32_t weight = p2.dijkstra(vertex)[123];
     }
   }
