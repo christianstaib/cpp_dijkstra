@@ -16,18 +16,14 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Get_processor_name(processor_name, &namelen);
 
-  if (rank == 0) {
-    printf("There are %d processes in total\n", num_procs);
-  }
-
   printf("rank:%d num_procs:%d\n", rank, num_procs);
 
-  printf("loading file\n");
-  std::ifstream file("example.json");
-  nlohmann::json data = nlohmann::json::parse(file);
+  // printf("loading file\n");
+  // std::ifstream file("example.json");
+  // nlohmann::json data = nlohmann::json::parse(file);
 
-  auto p2 = data.template get<graph::reversibleVecGraph>();
-  printf("there are %d vertices\n", p2.number_of_vertices);
+  // auto p2 = data.template get<graph::reversibleVecGraph>();
+  // printf("there are %d vertices\n", p2.number_of_vertices);
 
   // #pragma omp parallel
   //   {
