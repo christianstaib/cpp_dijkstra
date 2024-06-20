@@ -29,18 +29,25 @@ int main(int argc, char *argv[]) {
 
 #pragma omp parallel
   {
-#pragma omp for
-    for (int vertex = rank; vertex < p2.number_of_vertices;
-         vertex += num_procs) {
-
-      int thread_nr = omp_get_thread_num();
-      int num_threads = omp_get_num_threads();
-
-      printf("%d t:%d, p:%d, n:%s, num_threads:%d\n", vertex, thread_nr, rank,
-             processor_name, num_threads);
-      int32_t weight = p2.dijkstra(vertex)[123];
-    }
+    int omp_rank = omp_get_thread_num();
+    printf("I'm thread %d in process %d\n", omp_rank, rank);
   }
+
+  // #pragma omp parallel
+  //   {
+  // #pragma omp for
+  //     for (int vertex = rank; vertex < p2.number_of_vertices;
+  //          vertex += num_procs) {
+  //
+  //       int thread_nr = omp_get_thread_num();
+  //       int num_threads = omp_get_num_threads();
+  //
+  //       printf("%d t:%d, p:%d, n:%s, num_threads:%d\n", vertex, thread_nr,
+  //       rank,
+  //              processor_name, num_threads);
+  //       int32_t weight = p2.dijkstra(vertex)[123];
+  //     }
+  //   }
 
   MPI_Finalize();
 }
