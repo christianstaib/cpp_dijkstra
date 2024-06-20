@@ -10,11 +10,20 @@
 
 using json = nlohmann::json;
 
-int main(int argc, char **argv) {
+int main(int argc, char *argv[]) {
+  int num_procs, rank, namelen;
+  char processor_name[MPI_MAX_PROCESSOR_NAME];
+  int thread_nr = 0;
 
-  printf("1\n");
   MPI_Init(&argc, &argv);
-  printf("2\n");
+  MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Get_processor_name(processor_name, &namelen);
+
+  if (rank == 0) {
+    printf("There are %d processes in total\n", num_procs);
+  }
+
   int myrank, nproc;
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nproc);
