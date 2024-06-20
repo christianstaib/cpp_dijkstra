@@ -5,11 +5,16 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <mpi.h>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
-int main() {
+int main(int argc, char **argv) {
+  MPI_Init(&argc, &argv);
+  int myrank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  printf("my rank is %d", myrank);
 
   std::ifstream f("example.json");
   json data = json::parse(f);
