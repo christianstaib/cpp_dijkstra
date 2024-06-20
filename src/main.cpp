@@ -35,8 +35,7 @@ int main(int argc, char **argv) {
     //
     if (i % 1000 == 0) {
 
-      float progress_percent =
-          (float)num_fin_vertex / (float)p2.number_of_vertices * 100.0;
+      float progress_percent = (float)i / (float)p2.number_of_vertices * 100.0;
 
       printf("%f%%\n", progress_percent);
     }
