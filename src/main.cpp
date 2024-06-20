@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
   nlohmann::json data = nlohmann::json::parse(file);
 
   auto p2 = data.template get<graph::reversibleVecGraph>();
-  printf("there are %d vertices", p2.number_of_vertices);
+  printf("there are %d vertices\n", p2.number_of_vertices);
 
   // #pragma omp parallel
   //   {
