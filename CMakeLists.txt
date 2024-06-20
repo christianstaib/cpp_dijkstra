@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(compressor CXX)
 
-find_package(MP REQUIRED)
+find_package(OpenMP REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(MPI REQUIRED)
 message(STATUS "Run: ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS} EXECUTABLE ${MPIEXEC_POSTFLAGS} ARGS")
