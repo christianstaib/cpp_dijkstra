@@ -1,6 +1,7 @@
 // Compile with: mpicc -fopenmp hello_hybrid.c -o hello_hybrid
 
 #include "graph.hpp"
+#include <cstdint>
 #include <fstream>
 #include <mpi.h>
 #include <nlohmann/json.hpp>
@@ -27,17 +28,13 @@ int main(int argc, char *argv[]) {
 
   auto p2 = data.template get<graph::reversibleVecGraph>();
 
-#pragma omp parallel default(shared) private(thread_nr)
+#pragma omp parallel
   {
-#pragma omp single
-    {
-      int num_threads = omp_get_num_threads();
-      printf("There are %d threads of process %d on %s\n", num_threads, rank,
-             processor_name);
+#pragma omp for
+    for (int vertex = rank; vertex < p2.number_of_vertices;
+         vertex += num_procs) {
+      int32_t weight = p2.dijkstra(vertex)[123];
     }
-    thread_nr = omp_get_thread_num();
-    printf("Hello World from thread %d from process %d on node %s\n", thread_nr,
-           rank, processor_name);
   }
 
   MPI_Finalize();
