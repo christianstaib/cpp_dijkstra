@@ -42,6 +42,8 @@ int main(int argc, char **argv) {
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 
+  printf("there are processors %d\n", nproc);
+
   std::ifstream file("example.json");
   json data = json::parse(file);
 
