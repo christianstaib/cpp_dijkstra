@@ -23,6 +23,8 @@ int main(int argc, char *argv[]) {
   auto p2 = data.template get<graph::reversibleVecGraph>();
   printf("there are %d vertices\n", p2.number_of_vertices);
 
+  printf("rank %d out of %d", rank, num_procs);
+
 #pragma omp parallel
   {
 #pragma omp for
