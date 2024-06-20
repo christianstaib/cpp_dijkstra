@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
 #pragma omp for
     for (int vertex = rank; vertex < p2.number_of_vertices;
          vertex += num_procs) {
-      printf("%d", vertex);
+      printf("%d\n", vertex);
       // int32_t weight = p2.dijkstra(vertex)[123];
     }
   }
