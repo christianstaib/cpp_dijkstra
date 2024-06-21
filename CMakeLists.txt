@@ -9,9 +9,8 @@ find_package(MPI REQUIRED)
 find_package(zpp_bits REQUIRED)
 message(STATUS "Run: ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS} EXECUTABLE ${MPIEXEC_POSTFLAGS} ARGS")
 
-
+include_directories(SYSTEM ${MPI_C_INCLUDE_PATH})
 add_executable(${PROJECT_NAME} src/main.cpp src/graph.cpp)
 
 target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_CXX nlohmann_json::nlohmann_json zpp_bits::zpp_bits MPI::MPI_CXX)
-
 
