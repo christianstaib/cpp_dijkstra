@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <vector>
+#include <zpp_bits.h>
 
 namespace graph {
 class weightedDirectedEdge {
@@ -35,6 +36,11 @@ class path {
 public:
   std::vector<uint32_t> vertices;
   uint32_t weight;
+
+  // Serialization function using zpp_bits
+  template <typename Archive> void serialize(Archive &archive) {
+    archive(vertices, weight);
+  }
 
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(path, vertices, weight);
 };

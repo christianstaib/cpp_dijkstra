@@ -8,6 +8,7 @@
 #include <omp.h>
 #include <stdio.h>
 #include <vector>
+#include <zpp_bits.h>
 
 int main(int argc, char *argv[]) {
   int num_procs, rank, namelen;
@@ -17,6 +18,29 @@ int main(int argc, char *argv[]) {
   MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Get_processor_name(processor_name, &namelen);
+
+  if (rank == 1) {
+    graph::path p;
+    p.vertices = {1, 2, 3, 4};
+    p.weight = 10;
+
+    nlohmann::json j = p;
+    auto x = j.dump();
+
+    MPI_Send(x.c_str(), x.size(), MPI_CHAR, 0, 0, MPI_COMM_WORLD);
+  } else if (rank == 0) {
+    MPI_Status status;
+    MPI_Probe(1, 0, MPI_COMM_WORLD, &status);
+
+    int message_size;
+    MPI_Get_count(&status, MPI_CHAR, &message_size);
+
+    std::vector<char> buffer(message_size);
+    MPI_Recv(buffer.data(), message_size, MPI_CHAR, 1, 0, MPI_COMM_WORLD,
+             MPI_STATUS_IGNORE);
+
+    printf("%s", buffer.data());
+  }
 
   // read the graph
   std::ifstream graph_file("example.json");
