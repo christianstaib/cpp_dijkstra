@@ -26,9 +26,10 @@ int main(int argc, char **argv) {
       printf("There are %d threads of process %d on %s\n", num_threads, rank,
              processor_name);
     }
-    thread_nr = omp_get_thread_num();
-    printf("Hello World from thread %d from process %d on node %s\n", thread_nr,
-           rank, processor_name);
+    // thread_nr = omp_get_thread_num();
+    // printf("Hello World from thread %d from process %d on node %s\n",
+    // thread_nr,
+    //        rank, processor_name);
   }
 
   MPI_Finalize();
