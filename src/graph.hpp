@@ -37,12 +37,6 @@ public:
   uint32_t weight;
 
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(path, vertices, weight);
-
-  template <class Archive>
-  void serialize(Archive &ar, const unsigned int version) {
-    ar & vertices;
-    ar & weight;
-  }
 };
 
 class reversibleVecGraph {

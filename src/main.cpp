@@ -1,10 +1,6 @@
 // Compile with: mpicc -fopenmp hello_hybrid.c -o hello_hybrid
 
 #include "graph.hpp"
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/mpi.hpp>
-#include <boost/serialization/string.hpp>
 #include <cstdint>
 #include <fstream>
 #include <mpi.h>
@@ -12,7 +8,6 @@
 #include <omp.h>
 #include <stdio.h>
 #include <vector>
-namespace mpi = boost::mpi;
 
 int main(int argc, char *argv[]) {
   int num_procs, rank, namelen;
@@ -30,21 +25,6 @@ int main(int argc, char *argv[]) {
 
   // vector to save all calculated paths
   std::vector<graph::path> paths = std::vector<graph::path>();
-
-  mpi::environment env;
-  mpi::communicator world;
-  if (world.rank() == 0) {
-    world.send(1, 0, std::string("Hello"));
-    std::string msg;
-    world.recv(1, 1, msg);
-    std::cout << msg << "!" << std::endl;
-  } else {
-    std::string msg;
-    world.recv(0, 0, msg);
-    std::cout << msg << ", ";
-    std::cout.flush();
-    world.send(0, 1, std::string("world"));
-  }
 
 #pragma omp parallel
   {

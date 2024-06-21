@@ -1,6 +1,6 @@
 [requires]
 nlohmann_json/3.11.3
-bitsery/5.2.3
+zpp_bits/4.4.20
 
 [generators]
 CMakeDeps
