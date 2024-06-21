@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <vector>
 
 namespace graph {
@@ -30,6 +31,20 @@ public:
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(directedHeadlessWeightedEdge, tail, weight);
 };
 
+class path {
+public:
+  std::vector<uint32_t> vertices;
+  uint32_t weight;
+
+  NLOHMANN_DEFINE_TYPE_INTRUSIVE(path, vertices, weight);
+
+  template <class Archive>
+  void serialize(Archive &ar, const unsigned int version) {
+    ar & vertices;
+    ar & weight;
+  }
+};
+
 class reversibleVecGraph {
 public:
   std::vector<std::vector<directedTaillessWeightedEdge>> out_edges;
@@ -39,6 +54,9 @@ public:
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(reversibleVecGraph, out_edges, in_edges,
                                  number_of_vertices);
 
-  std::vector<uint32_t> dijkstra(uint32_t start) const;
+  std::pair<std::vector<uint32_t>, std::vector<uint32_t>>
+  dijkstra(uint32_t source) const;
+
+  std::optional<path> dijkstra(uint32_t source, uint32_t target) const;
 };
 } // namespace graph
