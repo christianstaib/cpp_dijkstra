@@ -4,7 +4,7 @@
 #include <omp.h>
 #include <stdio.h>
 
-int main(int argc, char *argv[]) {
+int main(int argc, char **argv) {
   int num_procs, rank, namelen;
   char processor_name[MPI_MAX_PROCESSOR_NAME];
   int thread_nr = 0;
