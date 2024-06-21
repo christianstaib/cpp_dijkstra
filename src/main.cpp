@@ -20,6 +20,7 @@ int main(int argc, char *argv[]) {
   MPI_Get_processor_name(processor_name, &namelen);
 
   if (rank == 1) {
+    printf("rank 0");
     graph::path p;
     p.vertices = {1, 2, 3, 4};
     p.weight = 10;
@@ -29,6 +30,7 @@ int main(int argc, char *argv[]) {
 
     MPI_Send(x.c_str(), x.size(), MPI_CHAR, 0, 0, MPI_COMM_WORLD);
   } else if (rank == 0) {
+    printf("rank 1");
     MPI_Status status;
     MPI_Probe(1, 0, MPI_COMM_WORLD, &status);
 
