@@ -59,6 +59,7 @@ int main(int argc, char *argv[]) {
     for (int vertex = rank; vertex < graph.number_of_vertices;
          vertex += num_procs) {
 
+      printf("hello from thread %d in rank %d\n", omp_get_thread_num(), rank);
       auto path = graph.dijkstra(vertex, 1234);
 
       if (path) {
