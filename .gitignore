@@ -49,3 +49,6 @@ CMakeUserPresets.json
 
 # clangd
 .cache
+
+# stuff
+*.json
