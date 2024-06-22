@@ -47,7 +47,10 @@ int main(int argc, char *argv[]) {
     for (int vertex = rank; vertex < graph.number_of_vertices;
          vertex += num_procs) {
 
-      for (int reps = 0; reps < 1; ++reps) {
+      printf("hello from thread %d rank %d on %s\n", omp_get_thread_num(), rank,
+             processor_name);
+
+      for (int reps = 0; reps < 10; ++reps) {
         uint32_t source = dis(gen);
         uint32_t target = dis(gen);
         auto path = graph.dijkstra(source, target);
