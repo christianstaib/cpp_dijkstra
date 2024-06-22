@@ -34,6 +34,8 @@ int main(int argc, char *argv[]) {
 
 #pragma omp parallel
   {
+    printf("hello from thread %d rank %d on %s\n", omp_get_thread_num(), rank,
+           processor_name);
     // Create a random device and use it to seed the generator
     std::random_device rd;
     std::mt19937 gen(rd());
