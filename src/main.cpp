@@ -2,10 +2,12 @@
 
 #include "graph.hpp"
 #include <cstdint>
+#include <format>
 #include <fstream>
 #include <mpi.h>
 #include <nlohmann/json.hpp>
 #include <omp.h>
+#include <random>
 #include <stdio.h>
 #include <vector>
 #include <zpp_bits.h>
@@ -19,31 +21,8 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Get_processor_name(processor_name, &namelen);
 
-  printf("hello from rank %d\n", rank);
-  // if (rank == 1) {
-  //   printf("rank 0\n");
-  //   graph::path p;
-  //   p.vertices = {1, 2, 3, 4};
-  //   p.weight = 10;
-
-  //   nlohmann::json j = p;
-  //   auto x = j.dump();
-
-  //   MPI_Send(x.c_str(), x.size(), MPI_CHAR, 0, 0, MPI_COMM_WORLD);
-  // } else if (rank == 0) {
-  //   printf("rank 1\n");
-  //   MPI_Status status;
-  //   MPI_Probe(1, 0, MPI_COMM_WORLD, &status);
-
-  //   int message_size;
-  //   MPI_Get_count(&status, MPI_CHAR, &message_size);
-
-  //   std::vector<char> buffer(message_size);
-  //   MPI_Recv(buffer.data(), message_size, MPI_CHAR, 1, 0, MPI_COMM_WORLD,
-  //            MPI_STATUS_IGNORE);
-
-  //   printf("%s", buffer.data());
-  // }
+  // make sure we are set up corretly
+  printf("hello from rank %d on %s\n", rank, processor_name);
 
   // read the graph
   std::ifstream graph_file("example.json");
@@ -55,29 +34,33 @@ int main(int argc, char *argv[]) {
 
 #pragma omp parallel
   {
+    // Create a random device and use it to seed the generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Define the distribution range. Max is inclusive therfore -1
+    std::uniform_int_distribution<> dis(0, graph.number_of_vertices - 1);
+
 #pragma omp for
     for (int vertex = rank; vertex < graph.number_of_vertices;
          vertex += num_procs) {
 
-      printf("hello from thread %d in rank %d\n", omp_get_thread_num(), rank);
-      auto path = graph.dijkstra(vertex, 1234);
+      for (int reps = 0; reps < 1; ++reps) {
+        uint32_t source = dis(gen);
+        uint32_t target = dis(gen);
+        auto path = graph.dijkstra(source, target);
 
-      if (path) {
+        if (path) {
+          // only one write at a time, as vector is not threadsafe
 #pragma omp critical
-        {
-          // only one write at a time
-          paths.push_back(*path);
+          { paths.push_back(*path); }
         }
       }
     }
   }
 
-  if (rank == 0) {
-    std::vector<graph::path> all_paths(0);
-  }
-
   nlohmann::json j = paths;
-  std::ofstream out_file("key.json");
+  std::ofstream out_file(std::format("paths_%s.json", processor_name));
   out_file << j;
 
   MPI_Finalize();
