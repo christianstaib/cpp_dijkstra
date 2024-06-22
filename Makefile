@@ -6,8 +6,14 @@ cmake_release:
 	cd build && cmake --build .
 
 cluster:
-	salloc -p dev_multiple --nodes=2 -t 30 --ntasks-per-node=1 # --ntasks-per-node=1 wichtig!
+	salloc -p dev_multiple -N 2 -n 2 -t 30 # --ntasks-per-node=1 wichtig!
 	module load compiler/gnu
 	module load mpi/openmpi
 	export OMP_NUM_THREADS=80
 	mpirun --mca plm_slurm_args '--mem-per-cpu=0' build/compressor # --mca plm_slurm_args '--mem-per-cpu=0' wahrscheinlich nicht wichtig
+
+setup:
+	module load compiler/gnu
+	module load mpi/openmpi
+	export OMP_NUM_THREADS=80
+
