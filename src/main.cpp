@@ -6,7 +6,6 @@
 #include <fstream>
 #include <mpi.h>
 #include <nlohmann/json.hpp>
-#include <omp.h>
 #include <random>
 #include <stdio.h>
 #include <vector>
@@ -32,34 +31,23 @@ int main(int argc, char *argv[]) {
   // vector to save all calculated paths
   std::vector<graph::path> paths = std::vector<graph::path>();
 
-#pragma omp parallel
-  {
-    printf("hello from thread %d rank %d on %s\n", omp_get_thread_num(), rank,
-           processor_name);
-    // Create a random device and use it to seed the generator
-    std::random_device rd;
-    std::mt19937 gen(rd());
+  // Create a random device and use it to seed the generator
+  std::random_device rd;
+  std::mt19937 gen(rd());
 
-    // Define the distribution range. Max is inclusive therfore -1
-    std::uniform_int_distribution<> dis(0, graph.number_of_vertices - 1);
+  // Define the distribution range. Max is inclusive therfore -1
+  std::uniform_int_distribution<> dis(0, graph.number_of_vertices - 1);
 
-#pragma omp for
-    for (int vertex = rank; vertex < graph.number_of_vertices;
-         vertex += num_procs) {
+  for (int vertex = rank; vertex < graph.number_of_vertices;
+       vertex += num_procs) {
 
-      printf("hello from thread %d rank %d on %s\n", omp_get_thread_num(), rank,
-             processor_name);
+    for (int reps = 0; reps < 10; ++reps) {
+      uint32_t source = dis(gen);
+      uint32_t target = dis(gen);
+      auto path = graph.dijkstra(source, target);
 
-      for (int reps = 0; reps < 10; ++reps) {
-        uint32_t source = dis(gen);
-        uint32_t target = dis(gen);
-        auto path = graph.dijkstra(source, target);
-
-        if (path) {
-          // only one write at a time, as vector is not threadsafe
-#pragma omp critical
-          { paths.push_back(*path); }
-        }
+      if (path) {
+        paths.push_back(*path);
       }
     }
   }
