@@ -2,12 +2,12 @@
 
 #include "graph.hpp"
 #include <cstdint>
+#include <cstdio>
 #include <format>
 #include <fstream>
 #include <mpi.h>
 #include <nlohmann/json.hpp>
 #include <random>
-#include <stdio.h>
 #include <vector>
 #include <zpp_bits.h>
 
@@ -20,8 +20,36 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Get_processor_name(processor_name, &namelen);
 
-  // make sure we are set up corretly
-  printf("hello from rank %d on %s\n", rank, processor_name);
+  //
+  // SENDER
+  //
+
+  std::vector<std::byte> data;
+  if (rank == 0) {
+    // initialize a path
+    graph::path paths_sender;
+    paths_sender.vertices = {1, 2, 3, 4};
+    paths_sender.weight = 10;
+
+    std::vector<graph::path> v1 = {paths_sender};
+    auto out_sender = zpp::bits::out(data);
+    (void)out_sender(v1);
+  }
+
+  //
+  // RECEIVER
+  //
+
+  std::vector<graph::path> paths_receiver;
+  auto out = zpp::bits::in(data);
+  (void)out(paths_receiver);
+
+  printf("weight is %d\n", paths_receiver[0].weight);
+  printf("length of vector<bytes> is %lu\n", data.size());
+
+  //
+  //
+  //
 
   // read the graph
   std::ifstream graph_file("example.json");
