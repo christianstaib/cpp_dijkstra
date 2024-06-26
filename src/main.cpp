@@ -24,8 +24,9 @@ int main(int argc, char *argv[]) {
   // SENDER
   //
 
-  std::vector<std::byte> data;
   if (rank == 0) {
+    std::vector<std::byte> data;
+    
     // initialize a path
     graph::path paths_sender;
     paths_sender.vertices = {1, 2, 3, 4};
@@ -34,18 +35,24 @@ int main(int argc, char *argv[]) {
     std::vector<graph::path> v1 = {paths_sender};
     auto out_sender = zpp::bits::out(data);
     (void)out_sender(v1);
+
+    MPI_Send(data.data(), data.size(), MPI_CHAR, 1, 0, MPI_COMM_WORLD);
   }
 
   //
   // RECEIVER
   //
 
-  std::vector<graph::path> paths_receiver;
-  auto out = zpp::bits::in(data);
-  (void)out(paths_receiver);
+  if (rank == 1) {
+    std::vector<std::byte> data;
 
-  printf("weight is %d\n", paths_receiver[0].weight);
-  printf("length of vector<bytes> is %lu\n", data.size());
+    std::vector<graph::path> paths_receiver;
+    auto out = zpp::bits::in(data);
+    (void)out(paths_receiver);
+
+    printf("weight is %d\n", paths_receiver[0].weight);
+    printf("length of vector<bytes> is %lu\n", data.size());
+  }
 
   //
   //
