@@ -1,5 +1,3 @@
-// Compile with: mpicc -fopenmp hello_hybrid.c -o hello_hybrid
-
 #include "graph.hpp"
 #include <cstdint>
 #include <cstdio>
@@ -26,7 +24,7 @@ int main(int argc, char *argv[]) {
 
   if (rank == 0) {
     std::vector<std::byte> data;
-    
+
     // initialize a path
     graph::path paths_sender;
     paths_sender.vertices = {1, 2, 3, 4};
