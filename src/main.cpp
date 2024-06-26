@@ -34,6 +34,7 @@ int main(int argc, char *argv[]) {
     auto out_sender = zpp::bits::out(data);
     (void)out_sender(v1);
 
+    printf("sender data size is %lu\n", data.size());
     MPI_Send(data.data(), data.size(), MPI_BYTE, 1, 0, MPI_COMM_WORLD);
   }
 
@@ -48,9 +49,11 @@ int main(int argc, char *argv[]) {
     // Probe for the incoming message to get the size
     MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
     MPI_Get_count(&status, MPI_BYTE, &data_size);
-    printf("data size is %d\n", data_size);
+    printf("receiver data size is %d\n", data_size);
 
-    std::vector<std::byte> data;
+    std::vector<std::byte> data(data_size);
+
+    MPI_Recv(data.data(), data_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status);
 
     std::vector<graph::path> paths_receiver;
     auto out = zpp::bits::in(data);
