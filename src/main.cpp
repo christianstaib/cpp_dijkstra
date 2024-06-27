@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
            omp_get_num_threads(), sched_getcpu());
 
 #pragma omp for
-    for (int vertex = rank; vertex < 1000000; vertex += num_procs) {
+    for (int vertex = rank; vertex < 100000000; vertex += num_procs) {
       for (int reps = 0; reps < 1; ++reps) {
         uint32_t source = dis(gen);
         uint32_t target = dis(gen);
