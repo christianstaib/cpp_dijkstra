@@ -137,6 +137,7 @@ int main(int argc, char *argv[]) {
       paths.insert(paths.end(), received_paths.begin(), received_paths.end());
     }
 
+    printf("there are %lu paths\n", paths.size());
     nlohmann::json j = paths;
     std::string out_file_name = std::format("paths_{}.json", rank);
     std::ofstream out_file(out_file_name.c_str());
