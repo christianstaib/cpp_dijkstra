@@ -23,6 +23,7 @@ int main(int argc, char *argv[]) {
 
   std::string graph_file_name = argv[1];
   int num_paths = std::stoi(argv[2]) / num_procs;
+  printf("expecting arround %d paths\n", num_paths * num_procs);
 
   //
   // setup graph over all nodes
