@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  printf("finish %d \n", omp_get_thread_num());
+  printf("finish %d \n", rank);
   nlohmann::json j = paths;
   std::ofstream out_file(std::format("paths_%s.json", processor_name));
   out_file << j;
