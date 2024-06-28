@@ -18,8 +18,8 @@ int main(int argc, char *argv[]) {
 
 #pragma omp parallel
   {
-    printf("hi from thread %d of %d on process %d on node %s \n",
-           omp_get_thread_num(), omp_get_num_threads(), sched_getcpu(),
+    printf("hi from thread %d of %d on process %d on cpu %d on node %s \n",
+           omp_get_thread_num(), omp_get_num_threads(), rank, sched_getcpu(),
            processor_name);
 
     // dummy workload
