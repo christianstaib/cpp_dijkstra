@@ -105,4 +105,5 @@ int main(int argc, char *argv[]) {
   out_file << j;
 
   MPI_Finalize();
+  return 0;
 }
