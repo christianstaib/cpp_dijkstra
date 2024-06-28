@@ -23,7 +23,10 @@ int main(int argc, char *argv[]) {
 
   std::string graph_file_name = argv[1];
   int num_paths = std::stoi(argv[2]) / num_procs;
-  printf("expecting arround %d paths\n", num_paths * num_procs);
+
+  if (rank == 0) {
+    printf("expecting arround %d paths\n", num_paths * num_procs);
+  }
 
   //
   // setup graph over all nodes
@@ -49,10 +52,16 @@ int main(int argc, char *argv[]) {
     uint64_t data_size = data.size();
     MPI_Bcast(&data_size, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
 
+    if (rank == 0) {
+      printf("broadcasting graph");
+    }
     // broadcast graph
     data.resize(data_size);
     MPI_Bcast(data.data(), data_size, MPI_BYTE, 0, MPI_COMM_WORLD);
 
+    if (rank == 0) {
+      printf("deserialing graph");
+    }
     // deserialze graph
     auto in_receiver = zpp::bits::in(data);
     (void)in_receiver(graph);
