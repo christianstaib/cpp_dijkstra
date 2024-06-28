@@ -12,7 +12,9 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Get_processor_name(processor_name, &namelen);
 
-  printf("there are %d processes\n", rank);
+  if (rank == 0) {
+    printf("there are %d processes\n", num_procs);
+  }
 
 #pragma omp parallel
   {
