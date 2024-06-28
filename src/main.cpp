@@ -1,6 +1,7 @@
 #include "graph.hpp"
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
 #include <format>
 #include <fstream>
 #include <mpi.h>
@@ -21,7 +22,9 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Get_processor_name(processor_name, &namelen);
 
-  std::string graph_file_name = argv[1];
+  std::string graph_file_path = argv[1];
+  std::string graph_file_name =
+      std::filesystem::path(graph_file_path).filename();
   int num_paths = std::stoi(argv[2]) / num_procs;
 
   if (rank == 0) {
@@ -37,7 +40,7 @@ int main(int argc, char *argv[]) {
   if (rank == 0) {
     // read the graph
     graph::reversibleVecGraph graph;
-    std::ifstream graph_file(graph_file_name);
+    std::ifstream graph_file(graph_file_path);
     nlohmann::json graph_data = nlohmann::json::parse(graph_file);
     graph = graph_data.template get<graph::reversibleVecGraph>();
 
@@ -150,7 +153,7 @@ int main(int argc, char *argv[]) {
 
     printf("there are %lu paths\n", paths.size());
     nlohmann::json j = paths;
-    std::string out_file_name = std::format("paths_{}.json", rank);
+    std::string out_file_name = std::format("{}.paths.json", graph_file_name);
     std::ofstream out_file(out_file_name.c_str());
     out_file << j;
   }
