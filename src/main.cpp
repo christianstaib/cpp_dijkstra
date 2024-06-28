@@ -57,6 +57,7 @@ int main(int argc, char *argv[]) {
   // vector to save all calculated paths
   std::vector<graph::path> paths = std::vector<graph::path>();
 
+  MPI_Barrier(MPI_COMM_WORLD);
   if (rank == 0) {
     printf("starting path calculations\n");
   }
