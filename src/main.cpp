@@ -53,14 +53,14 @@ int main(int argc, char *argv[]) {
     MPI_Bcast(&data_size, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
 
     if (rank == 0) {
-      printf("broadcasting graph");
+      printf("broadcasting graph\n");
     }
     // broadcast graph
     data.resize(data_size);
     MPI_Bcast(data.data(), data_size, MPI_BYTE, 0, MPI_COMM_WORLD);
 
     if (rank == 0) {
-      printf("deserialing graph");
+      printf("deserialing graph\n");
     }
     // deserialze graph
     auto in_receiver = zpp::bits::in(data);
