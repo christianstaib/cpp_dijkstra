@@ -19,3 +19,4 @@ setup:
 	export OMP_NUM_THREADS=80
 	export MKL_NUM_THREADS=80
 
+# time OMP_PROC_BIND=true OMP_NUM_THREADS=64 mpirun --map-by ppr:1:package build/paths
