@@ -134,6 +134,7 @@ int main(int argc, char *argv[]) {
       auto in_receiver = zpp::bits::in(data);
       (void)in_receiver(received_paths);
 
+      printf("there are %lu paths\n", paths.size());
       paths.insert(paths.end(), received_paths.begin(), received_paths.end());
     }
 
