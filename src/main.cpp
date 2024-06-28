@@ -109,6 +109,7 @@ int main(int argc, char *argv[]) {
   } else {
     for (int i = 0; i < num_procs - 1; ++i) {
       MPI_Status status;
+      MPI_Probe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
 
       int data_size = 0;
       MPI_Get_count(&status, MPI_BYTE, &data_size);
