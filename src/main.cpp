@@ -41,9 +41,13 @@ int main(int argc, char *argv[]) {
   uint64_t data_size = data.size();
   MPI_Bcast(&data_size, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
 
+  printf("%d data_size %lu", rank, data_size);
+
   // broadcast graph
   data.reserve(data_size);
   MPI_Bcast(data.data(), data_size, MPI_BYTE, 0, MPI_COMM_WORLD);
+
+  printf("%d data size %lu", rank, data.size());
 
   // deserialze graph
   auto out = zpp::bits::in(data);
