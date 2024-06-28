@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     //         sched_getcpu(), processor_name);
 
 #pragma omp for schedule(dynamic)
-    for (int vertex = rank; vertex < num_procs; vertex += num_procs) {
+    for (int vertex = rank; vertex < num_paths; vertex += num_procs) {
 
       uint32_t source = dis(gen);
       uint32_t target = dis(gen);
