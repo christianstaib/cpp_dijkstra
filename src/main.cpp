@@ -1,8 +1,6 @@
-#include <cstdint>
 #include <cstdio>
 #include <mpi.h>
 #include <omp.h>
-#include <random>
 #include <sched.h>
 
 int main(int argc, char *argv[]) {
@@ -14,35 +12,19 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Get_processor_name(processor_name, &namelen);
 
-  printf("starting path calculations\n");
+  printf("there are %d processes\n", rank);
+
 #pragma omp parallel
   {
-    //
-    // setup thread local random number generator
-    //
-
-    // Create a random device and use it to seed the generator
-    std::random_device rd;
-    std::mt19937 gen(rd());
-
-    // Define the distribution range. Max is inclusive therfore -1
-    std::uniform_int_distribution<> dis(0, 99999);
-
     printf("hi from thread %d of %d on process %d on node %s \n",
            omp_get_thread_num(), omp_get_num_threads(), sched_getcpu(),
            processor_name);
 
-#pragma omp for
-    for (int vertex = rank; vertex < 1000000000; vertex += num_procs) {
-      for (int reps = 0; reps < 1; ++reps) {
-        uint32_t source = dis(gen);
-        uint32_t target = dis(gen);
-
-        // dummy work to keep threads running
-        for (; target > 0; --target) {
-        }
-      }
+    // dummy workload
+    int i = 0;
+    while (true) {
     }
+    ++i;
   }
 
   printf("finish %d \n", omp_get_thread_num());
