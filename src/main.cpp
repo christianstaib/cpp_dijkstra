@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
     //         omp_get_thread_num(), omp_get_num_threads(), rank, num_procs,
     //         sched_getcpu(), processor_name);
 
-#pragma omp for
+#pragma omp for schedule(dynamic)
     for (int vertex = rank; vertex < graph.number_of_vertices;
          vertex += num_procs) {
       for (int reps = 0; reps < 10; ++reps) {
