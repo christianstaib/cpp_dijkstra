@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
   printf("%d data_size %lu\n", rank, data_size);
 
   // broadcast graph
-  data.reserve(data_size);
+  data.resize(data_size);
   MPI_Bcast(data.data(), data_size, MPI_BYTE, 0, MPI_COMM_WORLD);
 
   printf("%d data size %lu\n", rank, data.size());
