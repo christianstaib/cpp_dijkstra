@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
 #pragma omp for
     for (int vertex = rank; vertex < graph.number_of_vertices;
          vertex += num_procs) {
-      for (int reps = 0; reps < 1; ++reps) {
+      for (int reps = 0; reps < 10; ++reps) {
         uint32_t source = dis(gen);
         uint32_t target = dis(gen);
         auto path = graph.dijkstra(source, target);
