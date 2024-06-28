@@ -90,15 +90,13 @@ int main(int argc, char *argv[]) {
     for (int vertex = rank; vertex < graph.number_of_vertices;
          vertex += num_procs) {
 
-      for (int reps = 0; reps < 10; ++reps) {
-        uint32_t source = dis(gen);
-        uint32_t target = dis(gen);
-        auto path = graph.dijkstra(source, target);
+      uint32_t source = dis(gen);
+      uint32_t target = dis(gen);
+      auto path = graph.dijkstra(source, target);
 
-        if (path) {
+      if (path) {
 #pragma omp critical
-          paths.push_back(*path);
-        }
+        paths.push_back(*path);
       }
     }
   }
