@@ -12,6 +12,7 @@
 #include <zpp_bits.h>
 
 int main(int argc, char *argv[]) {
+
   int num_procs, rank, namelen;
   char processor_name[MPI_MAX_PROCESSOR_NAME];
 
@@ -19,6 +20,9 @@ int main(int argc, char *argv[]) {
   MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Get_processor_name(processor_name, &namelen);
+
+  std::string graph_file_name = argv[1];
+  int num_paths = std::stoi(argv[2]) / num_procs;
 
   //
   // setup graph over all nodes
@@ -87,8 +91,7 @@ int main(int argc, char *argv[]) {
     //         sched_getcpu(), processor_name);
 
 #pragma omp for schedule(dynamic)
-    for (int vertex = rank; vertex < graph.number_of_vertices;
-         vertex += num_procs) {
+    for (int vertex = rank; vertex < num_procs; vertex += num_procs) {
 
       uint32_t source = dis(gen);
       uint32_t target = dis(gen);
@@ -142,4 +145,16 @@ int main(int argc, char *argv[]) {
 
   MPI_Finalize();
   return 0;
+}
+
+std::vector<unsigned int> divide_into_parts(unsigned int number,
+                                            unsigned int parts) {
+  std::vector<unsigned int> result(parts, number / parts);
+  unsigned int remainder = number % parts;
+
+  for (unsigned int i = 0; i < remainder; ++i) {
+    ++result[i];
+  }
+
+  return result;
 }
