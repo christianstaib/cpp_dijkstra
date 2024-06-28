@@ -41,13 +41,9 @@ int main(int argc, char *argv[]) {
   uint64_t data_size = data.size();
   MPI_Bcast(&data_size, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
 
-  printf("%d data_size %lu\n", rank, data_size);
-
   // broadcast graph
   data.resize(data_size);
   MPI_Bcast(data.data(), data_size, MPI_BYTE, 0, MPI_COMM_WORLD);
-
-  printf("%d data size %lu\n", rank, data.size());
 
   // deserialze graph
   auto out = zpp::bits::in(data);
@@ -104,9 +100,9 @@ int main(int argc, char *argv[]) {
   }
 
   printf("finish %d with %lu paths\n", rank, paths.size());
-  // nlohmann::json j = paths;
-  // std::ofstream out_file(std::format("paths_%s.json", processor_name));
-  // out_file << j;
+  nlohmann::json j = paths;
+  std::ofstream out_file(std::format("paths_%d.json", rank));
+  out_file << j;
 
   MPI_Finalize();
 }
