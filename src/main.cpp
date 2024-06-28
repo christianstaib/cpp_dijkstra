@@ -38,8 +38,8 @@ int main(int argc, char *argv[]) {
   }
 
   // broadcast size of graph
-  int data_size = data.size();
-  MPI_Bcast(&data_size, 1, MPI_INT64_T, 0, MPI_COMM_WORLD);
+  uint64_t data_size = data.size();
+  MPI_Bcast(&data_size, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
 
   // broadcast graph
   data.reserve(data_size);
