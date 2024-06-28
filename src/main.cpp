@@ -89,6 +89,7 @@ int main(int argc, char *argv[]) {
 #pragma omp for schedule(dynamic)
     for (int vertex = rank; vertex < graph.number_of_vertices;
          vertex += num_procs) {
+
       for (int reps = 0; reps < 10; ++reps) {
         uint32_t source = dis(gen);
         uint32_t target = dis(gen);
@@ -103,31 +104,37 @@ int main(int argc, char *argv[]) {
   }
 
   if (rank != 0) {
+    //
+    // send local paths to rank 0
+    //
     auto out_sender = zpp::bits::out(data);
     (void)out_sender(paths);
     MPI_Send(data.data(), data.size(), MPI_BYTE, 0, 0, MPI_COMM_WORLD);
-    printf("i sended %lu paths from rank %d\n", paths.size(), rank);
   } else {
+    //
+    // receive local paths
+    //
     for (int i = 0; i < num_procs - 1; ++i) {
+      // probe incomming message
       MPI_Status status;
       MPI_Probe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
 
+      // retrieve size of incommin message
       int data_size = 0;
       MPI_Get_count(&status, MPI_BYTE, &data_size);
       data.resize(data_size);
 
+      // reseive incomming message
       MPI_Recv(data.data(), data_size, MPI_BYTE, MPI_ANY_SOURCE, 0,
                MPI_COMM_WORLD, &status);
 
+      // deserialise pathes
       std::vector<graph::path> received_paths;
       auto in_receiver = zpp::bits::in(data);
       (void)in_receiver(received_paths);
-      printf("i received %lu paths from rank %d\n", received_paths.size(),
-             status.MPI_SOURCE);
+
       paths.insert(paths.end(), received_paths.begin(), received_paths.end());
     }
-
-    printf("there are %lu paths in total\n", paths.size());
 
     nlohmann::json j = paths;
     std::string out_file_name = std::format("paths_{}.json", rank);
