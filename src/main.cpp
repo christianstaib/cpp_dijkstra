@@ -57,7 +57,10 @@ int main(int argc, char *argv[]) {
   // vector to save all calculated paths
   std::vector<graph::path> paths = std::vector<graph::path>();
 
-  printf("starting path calculations\n");
+  if (rank == 0) {
+    printf("starting path calculations\n");
+  }
+
 #pragma omp parallel
   {
     //
@@ -71,8 +74,10 @@ int main(int argc, char *argv[]) {
     // Define the distribution range. Max is inclusive therfore -1
     std::uniform_int_distribution<> dis(0, graph.number_of_vertices - 1);
 
-    printf("hi from thread %d of %d on %d \n", omp_get_thread_num(),
-           omp_get_num_threads(), sched_getcpu());
+    printf("hi from thread %d of %d from process %d of %d. This thread is "
+           "running on cpu %d on node %s\n",
+           omp_get_thread_num(), omp_get_num_threads(), rank, num_procs,
+           sched_getcpu(), processor_name);
 
 #pragma omp for
     for (int vertex = rank; vertex < graph.number_of_vertices;
