@@ -105,6 +105,7 @@ int main(int argc, char *argv[]) {
   std::ofstream out_file(out_file_name.c_str());
   out_file << j;
 
+  MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
   return 0;
 }
