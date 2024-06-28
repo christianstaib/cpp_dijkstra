@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
   if (rank == 0) {
     // read the graph
     graph::reversibleVecGraph graph;
-    std::ifstream graph_file("example.json");
+    std::ifstream graph_file(graph_file_name);
     nlohmann::json graph_data = nlohmann::json::parse(graph_file);
     graph = graph_data.template get<graph::reversibleVecGraph>();
 
