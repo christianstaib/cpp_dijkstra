@@ -87,7 +87,8 @@ int main(int argc, char *argv[]) {
     //         sched_getcpu(), processor_name);
 
 #pragma omp for schedule(dynamic)
-    for (int vertex = rank; vertex < 100; vertex += num_procs) {
+    for (int vertex = rank; vertex < graph.number_of_vertices;
+         vertex += num_procs) {
       for (int reps = 0; reps < 10; ++reps) {
         uint32_t source = dis(gen);
         uint32_t target = dis(gen);
