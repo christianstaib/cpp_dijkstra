@@ -14,7 +14,9 @@
 
 int main(int argc, char *argv[]) {
 
-  int num_procs, rank, namelen;
+  int num_procs = 0;
+  int rank = 0;
+  int namelen = 0;
   char processor_name[MPI_MAX_PROCESSOR_NAME];
 
   MPI_Init(&argc, &argv);
@@ -35,22 +37,21 @@ int main(int argc, char *argv[]) {
   // setup graph over all nodes
   //
 
-  std::vector<std::byte> data;
-
-  if (rank == 0) {
-    // read the graph
-    graph::reversibleVecGraph graph;
-    std::ifstream graph_file(graph_file_path);
-    nlohmann::json graph_data = nlohmann::json::parse(graph_file);
-    graph = graph_data.template get<graph::reversibleVecGraph>();
-
-    // serialize the graph
-    auto out_sender = zpp::bits::out(data);
-    (void)out_sender(graph);
-  }
-
   graph::reversibleVecGraph graph;
   {
+    std::vector<std::byte> data;
+    if (rank == 0) {
+      // read the graph
+      graph::reversibleVecGraph graph;
+      std::ifstream graph_file(graph_file_path);
+      nlohmann::json graph_data = nlohmann::json::parse(graph_file);
+      graph = graph_data.template get<graph::reversibleVecGraph>();
+
+      // serialize the graph
+      auto out_sender = zpp::bits::out(data);
+      (void)out_sender(graph);
+    }
+
     // broadcast size of graph
     uint64_t data_size = data.size();
     MPI_Bcast(&data_size, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
@@ -117,45 +118,48 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (rank != 0) {
-    //
-    // send local paths to rank 0
-    //
-    auto out_sender = zpp::bits::out(data);
-    (void)out_sender(paths);
-    MPI_Send(data.data(), data.size(), MPI_BYTE, 0, 0, MPI_COMM_WORLD);
-  } else {
-    //
-    // receive local paths
-    //
-    for (int i = 0; i < num_procs - 1; ++i) {
-      // probe incomming message
-      MPI_Status status;
-      MPI_Probe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+  {
+    std::vector<std::byte> data;
+    if (rank != 0) {
+      //
+      // send local paths to rank 0
+      //
+      auto out_sender = zpp::bits::out(data);
+      (void)out_sender(paths);
+      MPI_Send(data.data(), data.size(), MPI_BYTE, 0, 0, MPI_COMM_WORLD);
+    } else {
+      //
+      // receive local paths
+      //
+      for (int i = 0; i < num_procs - 1; ++i) {
+        // probe incomming message
+        MPI_Status status;
+        MPI_Probe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
 
-      // retrieve size of incommin message
-      int data_size = 0;
-      MPI_Get_count(&status, MPI_BYTE, &data_size);
-      data.resize(data_size);
+        // retrieve size of incommin message
+        int data_size = 0;
+        MPI_Get_count(&status, MPI_BYTE, &data_size);
+        data.resize(data_size);
 
-      // reseive incomming message
-      MPI_Recv(data.data(), data_size, MPI_BYTE, MPI_ANY_SOURCE, 0,
-               MPI_COMM_WORLD, &status);
+        // reseive incomming message
+        MPI_Recv(data.data(), data_size, MPI_BYTE, MPI_ANY_SOURCE, 0,
+                 MPI_COMM_WORLD, &status);
 
-      // deserialise pathes
-      std::vector<graph::path> received_paths;
-      auto in_receiver = zpp::bits::in(data);
-      (void)in_receiver(received_paths);
+        // deserialise pathes
+        std::vector<graph::path> received_paths;
+        auto in_receiver = zpp::bits::in(data);
+        (void)in_receiver(received_paths);
+
+        printf("there are %lu paths\n", paths.size());
+        paths.insert(paths.end(), received_paths.begin(), received_paths.end());
+      }
 
       printf("there are %lu paths\n", paths.size());
-      paths.insert(paths.end(), received_paths.begin(), received_paths.end());
+      nlohmann::json j = paths;
+      std::string out_file_name = std::format("{}.paths.json", graph_file_name);
+      std::ofstream out_file(out_file_name.c_str());
+      out_file << j;
     }
-
-    printf("there are %lu paths\n", paths.size());
-    nlohmann::json j = paths;
-    std::string out_file_name = std::format("{}.paths.json", graph_file_name);
-    std::ofstream out_file(out_file_name.c_str());
-    out_file << j;
   }
 
   MPI_Finalize();
