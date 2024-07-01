@@ -32,6 +32,23 @@ public:
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(directedHeadlessWeightedEdge, tail, weight);
 };
 
+class shortestPathRequest {
+public:
+  uint32_t source;
+  uint32_t target;
+
+  NLOHMANN_DEFINE_TYPE_INTRUSIVE(shortestPathRequest, source, target);
+};
+
+class shortestPathTestCaseC {
+public:
+  uint32_t source;
+  uint32_t target;
+  uint32_t weight;
+
+  NLOHMANN_DEFINE_TYPE_INTRUSIVE(shortestPathTestCaseC, source, target, weight);
+};
+
 class path {
 public:
   std::vector<uint32_t> vertices;
