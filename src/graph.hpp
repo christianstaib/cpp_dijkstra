@@ -62,6 +62,11 @@ public:
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(path, vertices, weight);
 };
 
+class graph {
+public:
+  std::vector<std::vector<directedTaillessWeightedEdge>> edges;
+};
+
 class reversibleVecGraph {
 public:
   std::vector<std::vector<directedTaillessWeightedEdge>> out_edges;

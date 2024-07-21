@@ -12,6 +12,34 @@
 #include <vector>
 #include <zpp_bits.h>
 
+void set_up_graph(int &rank, std::string &graph_file_path,
+                  graph::reversibleVecGraph &graph) {
+  std::vector<std::byte> data;
+  if (rank == 0) {
+    // read the graph
+    graph::reversibleVecGraph graph;
+    std::ifstream graph_file(graph_file_path);
+    nlohmann::json graph_data = nlohmann::json::parse(graph_file);
+    graph = graph_data.template get<graph::reversibleVecGraph>();
+
+    // serialize the graph
+    auto out_sender = zpp::bits::out(data);
+    (void)out_sender(graph);
+  }
+
+  // broadcast size of graph
+  uint64_t data_size = data.size();
+  MPI_Bcast(&data_size, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
+
+  // broadcast graph
+  data.resize(data_size);
+  MPI_Bcast(data.data(), data_size, MPI_BYTE, 0, MPI_COMM_WORLD);
+
+  // deserialze graph
+  auto in_receiver = zpp::bits::in(data);
+  (void)in_receiver(graph);
+}
+
 int main(int argc, char *argv[]) {
 
   int num_procs = 0;
@@ -38,38 +66,7 @@ int main(int argc, char *argv[]) {
   //
 
   graph::reversibleVecGraph graph;
-  {
-    std::vector<std::byte> data;
-    if (rank == 0) {
-      // read the graph
-      graph::reversibleVecGraph graph;
-      std::ifstream graph_file(graph_file_path);
-      nlohmann::json graph_data = nlohmann::json::parse(graph_file);
-      graph = graph_data.template get<graph::reversibleVecGraph>();
-
-      // serialize the graph
-      auto out_sender = zpp::bits::out(data);
-      (void)out_sender(graph);
-    }
-
-    // broadcast size of graph
-    uint64_t data_size = data.size();
-    MPI_Bcast(&data_size, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
-
-    if (rank == 0) {
-      printf("broadcasting graph\n");
-    }
-    // broadcast graph
-    data.resize(data_size);
-    MPI_Bcast(data.data(), data_size, MPI_BYTE, 0, MPI_COMM_WORLD);
-
-    if (rank == 0) {
-      printf("deserialing graph\n");
-    }
-    // deserialze graph
-    auto in_receiver = zpp::bits::in(data);
-    (void)in_receiver(graph);
-  }
+  set_up_graph(rank, graph_file_path, graph);
 
   //
   // calculates random paths
