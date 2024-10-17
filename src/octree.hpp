@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <glm/ext/vector_double3.hpp>
 #include <glm/glm.hpp> // Include GLM for vec3
 #include <vector>
 
@@ -16,6 +17,7 @@ public:
   // only gives a hint in which direction the subcube is. is not guranteed that
   // pos fits
   int find_subcube(glm::dvec3 pos);
+  bool contains(glm::dvec3 pos);
   Cube create_subcube(int quadrant);
   std::array<Cube, 8> subdivide();
 };
@@ -40,6 +42,7 @@ public:
   std::vector<Node> nodes;
   std::vector<int> parents; // parent of node[i] is nodes[parents[(i - 1)/8]]
 
+  Octree(glm::dvec3 center, double size);
   void propagate();
   void insert(glm::dvec3 pos, double mass);
   int subdivide(int node);
