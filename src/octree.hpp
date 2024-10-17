@@ -44,6 +44,7 @@ public:
 
   Octree(glm::dvec3 center, double size);
   void propagate();
+  glm::dvec3 acc(glm::dvec3 pos, double theta);
   void insert(glm::dvec3 pos, double mass);
   int subdivide(int node);
 };

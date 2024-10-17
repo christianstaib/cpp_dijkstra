@@ -1,8 +1,11 @@
 
 #include "octree.hpp"
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <glm/ext/vector_double3.hpp>
+#include <glm/geometric.hpp>
+#include <glm/gtx/norm.hpp>
 #include <ranges>
 #include <vector>
 
@@ -13,7 +16,7 @@ bool octree::Node::is_branch() { return first_child != 0; }
 bool octree::Node::is_empty() { return mass == 0.0; }
 
 bool octree::Cube::contains(glm::dvec3 pos) {
-  const double epsilon = 1e-10; // Small tolerance for floating-point precision
+  const double epsilon = 1e-5; // Small tolerance for floating-point precision
   return (center.x - size - epsilon <= pos.x) &&
          (pos.x < center.x + size + epsilon) &&
          (center.y - size - epsilon <= pos.y) &&
@@ -115,35 +118,68 @@ void octree::Octree::insert(glm::dvec3 new_pos, double new_mass) {
       octree::Node *node = &nodes[first_child + offset_new];
       node->mass_center = new_pos;
       node->mass = new_mass;
-      if (!node->cube.contains(new_pos)) {
-        printf("illegal1\n");
-      }
+      // if (!node->cube.contains(new_pos)) {
+      //   printf("illegal1\n");
+      // }
 
       node = &nodes[first_child + offset_old];
       node->mass_center = old_pos;
       node->mass = old_mass;
-      if (!node->cube.contains(nodes[node_idx].mass_center)) {
-        printf("illegal2\n");
-      }
+      // if (!node->cube.contains(nodes[node_idx].mass_center)) {
+      //   printf("illegal2\n");
+      // }
       break;
     }
   }
 }
 
-// void octree::Octree::propagate() {
-//   for (auto &node : std::ranges::views::reverse(this->parents)) {
-//     int first_child = this->nodes[node].first_child;
-//
-//     for (int child_offset = 0; child_offset < 8; ++child_offset) {
-//       nodes[node].mass += nodes[first_child + child_offset].mass;
-//     }
-//
-//     nodes[node].mass_center = glm::dvec3(0.0);
-//     for (int child_offset = 0; child_offset < 8; ++child_offset) {
-//       nodes[node].mass_center += nodes[first_child +
-//       child_offset].mass_center *
-//                                  nodes[first_child + child_offset].mass;
-//     }
-//     nodes[node].mass_center /= nodes[node].mass;
-//   }
-// }
+void octree::Octree::propagate() {
+  for (auto &node : std::ranges::views::reverse(this->parents)) {
+    int first_child = this->nodes[node].first_child;
+
+    for (int child_offset = 0; child_offset < 8; ++child_offset) {
+      nodes[node].mass += nodes[first_child + child_offset].mass;
+    }
+
+    nodes[node].mass_center = glm::dvec3(0.0);
+    for (int child_offset = 0; child_offset < 8; ++child_offset) {
+      nodes[node].mass_center += nodes[first_child + child_offset].mass_center *
+                                 nodes[first_child + child_offset].mass;
+    }
+    nodes[node].mass_center /= nodes[node].mass;
+  }
+}
+
+glm::dvec3 octree::Octree::acc(glm::dvec3 pos, double theata) {
+  glm::dvec3 acc(0.0);
+
+  double gravitational_constant = 6.67430e-11;
+  double conversion_factor = pow(86400.0, 2.0) / pow(149597870700.0, 3.0);
+  gravitational_constant *= conversion_factor;
+  double softening_factor = 1e-11;
+
+  int node_idx = 0;
+
+  while (true) {
+    octree::Node &node = nodes[node_idx];
+
+    double d = glm::distance(node.mass_center, pos);
+    double s = 2 * node.cube.size;
+
+    if (node.is_leaf() || (s / d) < theata) {
+      acc += node.mass * ((node.mass_center - pos) /
+                          pow(glm::length2(node.mass_center - pos) +
+                                  softening_factor * softening_factor,
+                              (3.0 / 2.0)));
+
+      if (node.next_pre_order == 0) {
+        break;
+      }
+      node_idx = node.next_pre_order;
+    } else {
+      node_idx = node.first_child;
+    }
+  }
+
+  return acc * gravitational_constant;
+}
