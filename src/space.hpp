@@ -18,7 +18,7 @@ public:
   /// Velocity relative to sun. Unit is AU/d
   glm::dvec3 vel;
 
-  CelestialBody(const std::string &string);
+  static CelestialBody from_state_vactors(const std::string &string);
 };
 
 } // namespace space

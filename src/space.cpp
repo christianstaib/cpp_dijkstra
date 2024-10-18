@@ -4,43 +4,49 @@
 namespace space {
 
 // Constructor to initialize CelestialBody from a CSV string
-CelestialBody::CelestialBody(const std::string &line) {
+CelestialBody CelestialBody::from_state_vactors(const std::string &line) {
   std::stringstream lineStream(line);
   std::string token;
 
+  // Create a new CelestialBody instance
+  CelestialBody body;
+
   // Parse the ID
   std::getline(lineStream, token, ',');
-  id = std::stoi(token);
+  body.id = std::stoi(token);
 
   // Parse the name
-  std::getline(lineStream, name, ',');
+  std::getline(lineStream, body.name, ',');
 
   // Parse the class type
-  std::getline(lineStream, class_type, ',');
+  std::getline(lineStream, body.class_type, ',');
 
   // Parse the mass
   std::getline(lineStream, token, ',');
-  mass = std::stod(token);
+  body.mass = std::stod(token);
 
   // Parse position (pos_x, pos_y, pos_z)
   std::getline(lineStream, token, ',');
-  pos.x = std::stod(token);
+  body.pos.x = std::stod(token);
 
   std::getline(lineStream, token, ',');
-  pos.y = std::stod(token);
+  body.pos.y = std::stod(token);
 
   std::getline(lineStream, token, ',');
-  pos.z = std::stod(token);
+  body.pos.z = std::stod(token);
 
   // Parse velocity (vel_x, vel_y, vel_z)
   std::getline(lineStream, token, ',');
-  vel.x = std::stod(token);
+  body.vel.x = std::stod(token);
 
   std::getline(lineStream, token, ',');
-  vel.y = std::stod(token);
+  body.vel.y = std::stod(token);
 
   std::getline(lineStream, token, ',');
-  vel.z = std::stod(token);
+  body.vel.z = std::stod(token);
+
+  // Return the populated CelestialBody instance
+  return body;
 }
 
 } // namespace space
