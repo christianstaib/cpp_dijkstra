@@ -182,15 +182,19 @@ DataRow DataRow::parse_planet_moon(const std::string &line) {
   return row;
 }
 
-CelestialBody DataRow::to_body(int id) {
+CelestialBody DataRow::to_body(
+    int id,
+    std::unordered_map<std::string, space::CelestialBody> const &bodies) {
   CelestialBody body;
+
+  space::CelestialBody central_body_body = bodies.at(central_body);
 
   // 1) Calculate mean anomaly m_t
   double m_t =
       mean_anomaly +
       (constants::sun_reference_epoch - epoch) *
           std::sqrt((constants::gravitational_constant_in_au3_per_kg_d2 *
-                     constants::sun_mass) /
+                     central_body_body.mass) /
                     pow(semi_major_axis, 3));
   // printf("m_t %f\n", m_t);
 
@@ -218,7 +222,7 @@ CelestialBody DataRow::to_body(int id) {
   glm::dvec3 vel(-sin(e_t), sqrt(1 - eccentricity * eccentricity) * cos(e_t),
                  0);
   vel *= sqrt(constants::gravitational_constant_in_au3_per_kg_d2 *
-              constants::sun_mass * semi_major_axis) /
+              central_body_body.mass * semi_major_axis) /
          distance_to_the_central_body;
 
   // this is correct
@@ -237,6 +241,10 @@ CelestialBody DataRow::to_body(int id) {
                glm::vec3(r31, r32, 0.0f));
   pos = pos * r; // WHY matrix on right side????? TODO
   vel = vel * r;
+
+  // 7.)
+  pos += central_body_body.pos;
+  vel += central_body_body.vel;
 
   body.id = id;
   body.mass = mass;

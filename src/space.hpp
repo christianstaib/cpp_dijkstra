@@ -2,6 +2,7 @@
 
 #include <glm/ext/vector_double3.hpp>
 #include <string>
+#include <unordered_map>
 
 namespace space {
 struct CelestialBody {
@@ -58,7 +59,9 @@ public:
   // TODO
   std::string central_body;
 
-  CelestialBody to_body(int id);
+  CelestialBody
+  to_body(int id,
+          std::unordered_map<std::string, space::CelestialBody> const &bodies);
 
   static DataRow parse_asteroid(const std::string &line);
   static DataRow parse_planet_moon(const std::string &line);
