@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <unordered_map>
+
 namespace constants {
 /// Number of seconds in a day.
 inline constexpr double seconds_in_day = 86400.0;
@@ -28,4 +31,13 @@ inline constexpr double softening_factor = 1e-11;
 /// Squared softening factor. See softening_factor for more information.
 inline constexpr double squared_softening_factor =
     softening_factor * softening_factor;
+
+const std::unordered_map<std::string, std::tuple<double, double>>
+    geometric_albedo = {{"AMO", {0.450, 0.550}}, {"APO", {0.450, 0.550}},
+                        {"ATE", {0.450, 0.550}}, {"IEO", {0.450, 0.550}},
+                        {"MCA", {0.450, 0.550}}, {"IMB", {0.030, 0.103}},
+                        {"MBA", {0.097, 0.203}}, {"OMB", {0.197, 0.500}},
+                        {"CEN", {0.450, 0.750}}, {"TJN", {0.188, 0.124}},
+                        {"TNO", {0.022, 0.130}}, {"AST", {0.450, 0.550}},
+                        {"PAA", {0.450, 0.550}}, {"HYA", {0.450, 0.550}}};
 } // namespace constants

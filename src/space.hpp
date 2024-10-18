@@ -56,6 +56,9 @@ public:
   // TODO
   std::string central_body;
 
-  static DataRow parse(const std::string &line);
+  CelestialBody to_body();
+
+  static DataRow parse_asteroid(const std::string &line);
+  static DataRow parse_planet_moon(const std::string &line);
 };
 } // namespace space
