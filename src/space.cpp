@@ -2,6 +2,8 @@
 #include "constants.hpp"
 #include <cmath>
 #include <cstdio>
+#include <glm/fwd.hpp>
+#include <glm/glm.hpp>
 #include <random>
 #include <sstream>
 
@@ -171,6 +173,56 @@ DataRow DataRow::parse_planet_moon(const std::string &line) {
   return row;
 }
 
-CelestialBody DataRow::to_body() {}
+CelestialBody DataRow::to_body() {
+  CelestialBody body;
+
+  // 1) Calculate M (t)
+  double m_t =
+      mean_anomaly +
+      (constants::sun_refrence_epoch - epoch) *
+          std::sqrt(
+              (constants::gravitational_constant_in_au3_per_kg_d2 * mass) /
+              pow(semi_major_axis, 3));
+
+  // 2) Solve Kepler’s equation
+  double e_t = m_t;
+  for (int i = 0; i < 30; ++i) {
+    double f = e_t - eccentricity * sin(e_t) - m_t;
+    double f_prime = 1 - eccentricity * cos(e_t);
+    e_t -= f / f_prime;
+  }
+
+  // 3) Calculate the true anomaly
+  double true_anomaly = 2.0 * atan2(sqrt(1 + eccentricity) * sin(e_t / 2),
+                                    sqrt(1 - eccentricity) * cos(e_t / 2));
+
+  // 4) Calculate the distance to the central to_body
+  double distance_to_the_central_body =
+      semi_major_axis * (1 - eccentricity * cos(e_t));
+
+  // 5) Calculate the position ~o(t) and velocity ˙~o(t) vectors in the orbital
+  // frame
+  glm::dvec3 pos(cos(true_anomaly), sin(true_anomaly), 0);
+  glm::dvec3 vel(-sin(e_t), sqrt(1 - eccentricity * eccentricity) * cos(e_t),
+                 0);
+
+  // 6)
+  double w = longitude_of_the_ascending_node;
+  double a = semi_major_axis;
+  double i = inclination;
+  glm::dmat3 r(glm::vec3(cos(w) * cos(a) - sin(w) * cos(i) * sin(a),
+                         -(sin(w) * cos(a) + cos(w) * cos(i) * sin(a)), 0.0f),
+               glm::vec3(cos(w) * sin(a) + sin(w) * cos(i) * cos(a),
+                         cos(w) * cos(i) * cos(a) - sin(w) * sin(a), 0.0f),
+               glm::vec3(sin(w) * sin(i), cos(w) * sin(i), 0.0f));
+  pos = r * pos;
+  vel = r * vel;
+
+  body.pos = pos;
+  body.vel = vel;
+  body.name = name;
+
+  return body;
+}
 
 } // namespace space

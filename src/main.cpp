@@ -28,11 +28,17 @@ std::vector<space::DataRow> read_rows(std::string path) {
 }
 
 int main() {
-  std::vector<space::DataRow> rows = read_rows("parse_planet_moon.csv");
+  std::vector<space::DataRow> rows = read_rows("planets_and_moons.csv");
 
-  for (space::DataRow const &row : rows) {
-    printf("%s\n", row.name.c_str());
+  for (int i = 0; i < 5; ++i) {
+    space::CelestialBody body = rows[i].to_body();
+    printf("%s pos %f %f %f\n", body.name.c_str(), body.pos.x, body.pos.y,
+           body.pos.z);
   }
+
+  // for (space::DataRow const &row : rows) {
+  //   printf("%s\n", row.name.c_str());
+  // }
 
   return 0;
 }

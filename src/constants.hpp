@@ -32,6 +32,9 @@ inline constexpr double softening_factor = 1e-11;
 inline constexpr double squared_softening_factor =
     softening_factor * softening_factor;
 
+/// TODO
+inline constexpr double sun_refrence_epoch = 2451544.5;
+
 const std::unordered_map<std::string, std::tuple<double, double>>
     geometric_albedo = {{"AMO", {0.450, 0.550}}, {"APO", {0.450, 0.550}},
                         {"ATE", {0.450, 0.550}}, {"IEO", {0.450, 0.550}},
