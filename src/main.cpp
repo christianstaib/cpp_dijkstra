@@ -30,10 +30,9 @@ std::vector<space::DataRow> read_rows(std::string path) {
 int main() {
   std::vector<space::DataRow> rows = read_rows("planets_and_moons.csv");
 
-  for (int i = 0; i < 5; ++i) {
-    space::CelestialBody body = rows[i].to_body();
-    printf("%s pos %f %f %f\n", body.name.c_str(), body.pos.x, body.pos.y,
-           body.pos.z);
+  for (int i = 0; i < 10; ++i) {
+    space::CelestialBody body = rows[i].to_body(i);
+    printf("%s\n", body.to_string().c_str());
   }
 
   // for (space::DataRow const &row : rows) {

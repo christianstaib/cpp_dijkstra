@@ -9,14 +9,16 @@ public:
   /// Unique of body. Might be helpful to avoid calculate force upon itself.
   int id;
   std::string name;
-  /// TODO
-  std::string class_type;
+  /// Type of body. Renamed from class as class is keyword.
+  std::string type;
   /// Mass of body. Unit is Kg
   double mass;
   /// Position relative to sun. Unit is AU
   glm::dvec3 pos;
   /// Velocity relative to sun. Unit is AU/d
   glm::dvec3 vel;
+
+  std::string to_string();
 
   static CelestialBody from_state_vactor_string(const std::string &string);
 
@@ -35,9 +37,9 @@ public:
   double longitude_of_the_ascending_node;
   /// rad
   double argument_of_periapsis;
-  // JD (julian day)
+  // rad
   double mean_anomaly;
-  // TODO
+  // JD
   double epoch;
 
   // TODO
@@ -50,13 +52,13 @@ public:
   double mass;
 
   // TODO
-  std::string class_name;
+  std::string type;
   // TODO
   std::string name;
   // TODO
   std::string central_body;
 
-  CelestialBody to_body();
+  CelestialBody to_body(int id);
 
   static DataRow parse_asteroid(const std::string &line);
   static DataRow parse_planet_moon(const std::string &line);

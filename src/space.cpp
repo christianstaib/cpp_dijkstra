@@ -4,8 +4,10 @@
 #include <cstdio>
 #include <glm/fwd.hpp>
 #include <glm/glm.hpp>
+#include <iomanip>
 #include <random>
 #include <sstream>
+#include <string>
 
 namespace space {
 
@@ -25,7 +27,7 @@ CelestialBody CelestialBody::from_state_vactor_string(const std::string &line) {
   std::getline(lineStream, body.name, ',');
 
   // Parse the class type
-  std::getline(lineStream, body.class_type, ',');
+  std::getline(lineStream, body.type, ',');
 
   // Parse the mass
   std::getline(lineStream, token, ',');
@@ -53,6 +55,14 @@ CelestialBody CelestialBody::from_state_vactor_string(const std::string &line) {
 
   // Return the populated CelestialBody instance
   return body;
+}
+
+std::string CelestialBody::to_string() {
+  std::stringstream ss;
+  ss << std::setprecision(std::numeric_limits<double>::max_digits10) << id
+     << "," << name << "," << type << "," << mass << "," << pos.x << ","
+     << pos.y << "," << pos.z << "," << vel.x << "," << vel.y << "," << vel.z;
+  return ss.str();
 }
 
 // Function to parse a single row of CSV data and return a DataRow object
@@ -96,7 +106,7 @@ DataRow DataRow::parse_asteroid(const std::string &line) {
   row.mass = 0.0;
 
   std::getline(ss, value, ',');
-  row.class_name = value;
+  row.type = value;
 
   std::getline(ss, value, ',');
   row.name = value;
@@ -104,9 +114,8 @@ DataRow DataRow::parse_asteroid(const std::string &line) {
   row.central_body = "Sun";
 
   if (row.mass == 0.0) {
-    if (row.albedo == 0.0 &&
-        constants::geometric_albedo.contains(row.class_name)) {
-      auto [min, max] = constants::geometric_albedo.at(row.class_name);
+    if (row.albedo == 0.0 && constants::geometric_albedo.contains(row.type)) {
+      auto [min, max] = constants::geometric_albedo.at(row.type);
       std::random_device rd;
       std::mt19937 gen(rd());
       std::uniform_real_distribution<> dist(min, max);
@@ -144,7 +153,7 @@ DataRow DataRow::parse_planet_moon(const std::string &line) {
   row.argument_of_periapsis = std::stod(value) * (M_PI / 180.0);
 
   std::getline(ss, value, ',');
-  row.mean_anomaly = std::stod(value);
+  row.mean_anomaly = std::stod(value) * (M_PI / 180.0);
 
   std::getline(ss, value, ',');
   row.epoch = std::stod(value);
@@ -162,7 +171,7 @@ DataRow DataRow::parse_planet_moon(const std::string &line) {
   row.mass = std::stod(value);
 
   std::getline(ss, value, ',');
-  row.class_name = value;
+  row.type = value;
 
   std::getline(ss, value, ',');
   row.name = value;
@@ -173,54 +182,68 @@ DataRow DataRow::parse_planet_moon(const std::string &line) {
   return row;
 }
 
-CelestialBody DataRow::to_body() {
+CelestialBody DataRow::to_body(int id) {
   CelestialBody body;
 
-  // 1) Calculate M (t)
+  // 1) Calculate mean anomaly m_t
   double m_t =
       mean_anomaly +
-      (constants::sun_refrence_epoch - epoch) *
-          std::sqrt(
-              (constants::gravitational_constant_in_au3_per_kg_d2 * mass) /
-              pow(semi_major_axis, 3));
+      (constants::sun_reference_epoch - epoch) *
+          std::sqrt((constants::gravitational_constant_in_au3_per_kg_d2 *
+                     constants::sun_mass) /
+                    pow(semi_major_axis, 3));
+  // printf("m_t %f\n", m_t);
 
-  // 2) Solve Kepler’s equation
+  // 2) Solve Kepler’s equation for eccentric anomaly e_t
   double e_t = m_t;
   for (int i = 0; i < 30; ++i) {
     double f = e_t - eccentricity * sin(e_t) - m_t;
     double f_prime = 1 - eccentricity * cos(e_t);
     e_t -= f / f_prime;
   }
-
   // 3) Calculate the true anomaly
   double true_anomaly = 2.0 * atan2(sqrt(1 + eccentricity) * sin(e_t / 2),
                                     sqrt(1 - eccentricity) * cos(e_t / 2));
+  // printf("true_anomaly %f\n", true_anomaly);
 
   // 4) Calculate the distance to the central to_body
   double distance_to_the_central_body =
       semi_major_axis * (1 - eccentricity * cos(e_t));
+  // printf("distance_to_the_central_body %f\n", distance_to_the_central_body);
 
   // 5) Calculate the position ~o(t) and velocity ˙~o(t) vectors in the orbital
   // frame
   glm::dvec3 pos(cos(true_anomaly), sin(true_anomaly), 0);
+  pos *= distance_to_the_central_body;
   glm::dvec3 vel(-sin(e_t), sqrt(1 - eccentricity * eccentricity) * cos(e_t),
                  0);
+  vel *= sqrt(constants::gravitational_constant_in_au3_per_kg_d2 *
+              constants::sun_mass * semi_major_axis) /
+         distance_to_the_central_body;
+
+  // this is correct
 
   // 6)
-  double w = longitude_of_the_ascending_node;
-  double a = semi_major_axis;
+  double lo = argument_of_periapsis;           // lower omega
+  double uo = longitude_of_the_ascending_node; // uper omega
   double i = inclination;
-  glm::dmat3 r(glm::vec3(cos(w) * cos(a) - sin(w) * cos(i) * sin(a),
-                         -(sin(w) * cos(a) + cos(w) * cos(i) * sin(a)), 0.0f),
-               glm::vec3(cos(w) * sin(a) + sin(w) * cos(i) * cos(a),
-                         cos(w) * cos(i) * cos(a) - sin(w) * sin(a), 0.0f),
-               glm::vec3(sin(w) * sin(i), cos(w) * sin(i), 0.0f));
-  pos = r * pos;
-  vel = r * vel;
+  double r11 = cos(lo) * cos(uo) - sin(lo) * cos(i) * sin(uo);
+  double r12 = -(sin(lo) * cos(uo) + cos(lo) * cos(i) * sin(uo));
+  double r21 = cos(lo) * sin(uo) + sin(lo) * cos(i) * cos(uo);
+  double r22 = cos(lo) * cos(i) * cos(uo) - sin(lo) * sin(uo);
+  double r31 = sin(lo) * sin(i);
+  double r32 = cos(lo) * sin(i);
+  glm::dmat3 r(glm::vec3(r11, r12, 0.0f), glm::vec3(r21, r22, 0.0f),
+               glm::vec3(r31, r32, 0.0f));
+  pos = pos * r; // WHY matrix on right side????? TODO
+  vel = vel * r;
 
+  body.id = id;
+  body.mass = mass;
+  body.name = name;
+  body.type = type;
   body.pos = pos;
   body.vel = vel;
-  body.name = name;
 
   return body;
 }
