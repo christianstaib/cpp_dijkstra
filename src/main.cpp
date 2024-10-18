@@ -52,7 +52,7 @@ std::vector<space::CelestialBody> read_bodies(std::string path) {
     //
     while (std::getline(file, line)) {
       space::CelestialBody body =
-          space::CelestialBody::from_state_vactors(line);
+          space::CelestialBody::from_state_vactor_string(line);
       bodies.push_back(body);
     }
     file.close();

@@ -4,7 +4,7 @@
 namespace space {
 
 // Constructor to initialize CelestialBody from a CSV string
-CelestialBody CelestialBody::from_state_vactors(const std::string &line) {
+CelestialBody CelestialBody::from_state_vactor_string(const std::string &line) {
   std::stringstream lineStream(line);
   std::string token;
 
@@ -47,6 +47,58 @@ CelestialBody CelestialBody::from_state_vactors(const std::string &line) {
 
   // Return the populated CelestialBody instance
   return body;
+}
+
+// Function to parse a single row of CSV data and return a DataRow object
+DataRow parseRow(const std::string &line) {
+  std::stringstream ss(line);
+  DataRow row;
+  std::string value;
+
+  // Parse each value from the line and assign to the corresponding field
+  std::getline(ss, value, ',');
+  row.eccentricity = std::stod(value);
+
+  std::getline(ss, value, ',');
+  row.semi_major_axis = std::stod(value);
+
+  std::getline(ss, value, ',');
+  row.inclination = std::stod(value);
+
+  std::getline(ss, value, ',');
+  row.longitude_of_the_ascending_node = std::stod(value);
+
+  std::getline(ss, value, ',');
+  row.argument_of_periapsis = std::stod(value);
+
+  std::getline(ss, value, ',');
+  row.mean_anomaly = std::stod(value);
+
+  std::getline(ss, value, ',');
+  row.epoch = std::stod(value);
+
+  std::getline(ss, value, ',');
+  row.h = std::stod(value);
+
+  std::getline(ss, value, ',');
+  row.albedo = std::stod(value);
+
+  std::getline(ss, value, ',');
+  row.diameter = std::stod(value);
+
+  std::getline(ss, value, ',');
+  row.mass = std::stod(value);
+
+  std::getline(ss, value, ',');
+  row.class_name = value;
+
+  std::getline(ss, value, ',');
+  row.name = value;
+
+  std::getline(ss, value, ',');
+  row.central_body = value;
+
+  return row;
 }
 
 } // namespace space
