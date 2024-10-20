@@ -19,6 +19,8 @@ public:
   /// Velocity relative to sun. Unit is AU/d
   glm::dvec3 vel;
 
+  double kinetic_energy();
+
   std::string to_string();
 
   static CelestialBody from_state_vactor_string(const std::string &string);
