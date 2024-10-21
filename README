@@ -1,1 +1,2 @@
 awk -F, 'BEGIN {OFS=","} NR==1 {print $0, "central_body"} NR>1 {print $0, "Sun"}' planets_and_moons.csv > output_file.csv
+awk 'FNR==1 && NR!=1 {next} {print}' file1.csv file2.csv > output_file.csv
