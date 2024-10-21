@@ -66,6 +66,11 @@ std::string CelestialBody::to_string() {
   return ss.str();
 }
 
+space::CelestialBody CelestialBody::sun() {
+  return CelestialBody{
+      0, "Sun", "STA", constants::sun_mass, glm::dvec3(0.0), glm::dvec3(0.0)};
+}
+
 // Function to parse a single row of CSV data and return a DataRow object
 DataRow DataRow::parse_asteroid(const std::string &line) {
   std::stringstream ss(line);
@@ -73,6 +78,7 @@ DataRow DataRow::parse_asteroid(const std::string &line) {
   std::string value;
 
   // Parse each value from the line and assign to the corresponding field
+  // e,a,i,om,w,ma,epoch,H,albedo,diameter,mass,class,name,central_body
   std::getline(ss, value, ',');
   row.eccentricity = std::stod(value);
 
@@ -103,7 +109,8 @@ DataRow DataRow::parse_asteroid(const std::string &line) {
   std::getline(ss, value, ',');
   row.diameter = value.empty() ? 0.0 : std::stod(value);
 
-  row.mass = 0.0;
+  std::getline(ss, value, ',');
+  row.mass = value.empty() ? 0.0 : std::stod(value);
 
   std::getline(ss, value, ',');
   row.type = value;
@@ -113,21 +120,22 @@ DataRow DataRow::parse_asteroid(const std::string &line) {
 
   row.central_body = "Sun";
 
-  if (row.albedo == 0.0) {
-    printf("%s has no albedo\n", row.name.c_str());
-    auto [min, max] = constants::geometric_albedo.at(row.type);
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dist(min, max);
-    row.albedo = dist(gen);
-  }
-
-  if (row.diameter == 0.0) {
-    printf("%s has no diameter\n", row.name.c_str());
-    row.diameter = 1329 * (1 / sqrt(row.albedo)) * pow(10.0, -0.2 * row.h);
-  }
-
   if (row.mass == 0.0) {
+    if (row.albedo == 0.0) {
+      // printf("%s\n", line.c_str());
+      // printf("%s has no albedo\n", row.name.c_str());
+      auto [min, max] = constants::geometric_albedo.at(row.type);
+      std::random_device rd;
+      std::mt19937 gen(rd());
+      std::uniform_real_distribution<> dist(min, max);
+      row.albedo = dist(gen);
+    }
+
+    if (row.diameter == 0.0) {
+      // printf("%s has no diameter\n", row.name.c_str());
+      row.diameter = 1329 * (1 / sqrt(row.albedo)) * pow(10.0, -0.2 * row.h);
+    }
+
     double p = 0.0;
 
     if (row.albedo < 0.1) {
@@ -140,7 +148,7 @@ DataRow DataRow::parse_asteroid(const std::string &line) {
 
     row.mass =
         (4.0 / 3.0) * M_PI * pow((row.diameter * 10e5) / 2, 3) * p / 10e5;
-    printf("%s has no mass but now its %f\n", row.name.c_str(), row.mass);
+    // printf("%s has no mass but now its %f\n", row.name.c_str(), row.mass);
     // printf("albedo %f\n", row.albedo);
     // printf("diameter %f\n", row.diameter);
     // printf("\n");

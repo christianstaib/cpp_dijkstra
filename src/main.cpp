@@ -9,6 +9,7 @@
 #include <glm/detail/qualifier.hpp>
 #include <glm/ext/quaternion_geometric.hpp>
 #include <glm/ext/vector_double3.hpp>
+#include <glm/geometric.hpp>
 #include <glm/gtx/component_wise.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <omp.h>
@@ -18,13 +19,17 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm/gtx/hash.hpp"
 
-std::vector<space::CelestialBody> read_planets_and_moons(std::string path) {
-  std::vector<space::CelestialBody> bodies;
+std::vector<space::CelestialBody> read_bodies(std::string path) {
+  // Set up data structures needed for reading the asteroids.
+  space::CelestialBody sun = space::CelestialBody::sun();
 
-  space::CelestialBody sun{
-      0, "Sun", "STA", constants::sun_mass, glm::dvec3(0.0), glm::dvec3(0.0)};
-  std::unordered_map<std::string, space::CelestialBody> bodies_map;
-  bodies_map.insert({"Sun", sun});
+  std::unordered_map<std::string, space::CelestialBody> name_to_body;
+  name_to_body.insert({"Sun", sun});
+
+  std::vector<std::pair<glm::dvec3, space::CelestialBody>> pos_to_body;
+  pos_to_body.push_back({sun.pos, sun});
+
+  std::vector<space::CelestialBody> bodies;
   bodies.push_back(sun);
 
   std::ifstream file(path);
@@ -32,46 +37,46 @@ std::vector<space::CelestialBody> read_planets_and_moons(std::string path) {
   if (file.is_open()) {
     std::string line;
     std::getline(file, line); // skip header
-    //
-    while (std::getline(file, line)) {
-      space::DataRow row = space::DataRow::parse_planet_moon(line);
-      space::CelestialBody body = row.to_body(bodies_map.size(), bodies_map);
-      bodies_map.insert({body.name, body});
-      bodies.push_back(body);
-    }
-    file.close();
-  }
-  return bodies;
-}
 
-std::vector<space::CelestialBody> read_asteroids(std::string path) {
-  std::vector<space::CelestialBody> bodies;
-
-  space::CelestialBody sun{
-      0, "Sun", "STA", constants::sun_mass, glm::dvec3(0.0), glm::dvec3(0.0)};
-  std::unordered_map<std::string, space::CelestialBody> bodies_map;
-  std::unordered_map<glm::dvec3, space::CelestialBody> bodies_map2;
-  bodies_map.insert({"Sun", sun});
-  bodies_map2.insert({glm::dvec3(0.0), sun});
-  bodies.push_back(sun);
-
-  std::ifstream file(path);
-
-  if (file.is_open()) {
-    std::string line;
-    std::getline(file, line); // skip header
-    //
     while (std::getline(file, line)) {
       space::DataRow row = space::DataRow::parse_asteroid(line);
-      space::CelestialBody body = row.to_body(bodies_map.size(), bodies_map);
-      bodies_map.insert({body.name, body});
-      bodies_map2.insert({body.pos, body});
+      space::CelestialBody body =
+          row.to_body(name_to_body.size(), name_to_body);
+
+      // printf("%s\n", line.c_str());
+      // printf("%f %f %f \n", body.pos.x, body.pos.y, body.pos.z);
+
+      if (!body.name.empty()) {
+        if (name_to_body.find(body.name) == name_to_body.end()) {
+          name_to_body.insert({body.name, body});
+        } else {
+          printf(
+              "Error: A bdoy with the name %s is already known (distance %f)\n",
+              body.name.c_str(),
+              glm::distance(body.pos, name_to_body.at(body.name).pos));
+        }
+      }
+
+      for (const auto &entry : pos_to_body) {
+        if (glm::distance(entry.second.pos, body.pos) <= 6.68459e-7) {
+          printf("Error: A body at the position %f %f %f is already known (it "
+                 "is called %s)\n",
+                 body.pos.x, body.pos.y, body.pos.z, entry.second.name.c_str());
+        }
+      }
+      pos_to_body.push_back({body.pos, body});
+
+      // if (pos_to_body.find(body.pos) == pos_to_body.end()) {
+      //   pos_to_body.insert({body.pos, body});
+      // } else {
+      //   printf("Error: A body at the position %f %f %f is already known\n",
+      //          body.pos.x, body.pos.y, body.pos.z);
+      // }
+
       bodies.push_back(body);
     }
     file.close();
   }
-
-  printf("%zu %zu %zu\n", bodies_map.size(), bodies_map2.size(), bodies.size());
 
   return bodies;
 }
@@ -80,31 +85,27 @@ std::vector<glm::dvec3>
 get_gravitational_force(const std::vector<space::CelestialBody> &bodies) {
   std::vector<glm::dvec3> force(bodies.size(), glm::dvec3(0));
 
-#pragma omp parallel
-  {
+#pragma omp parallel for
+  for (size_t i = 0; i < bodies.size(); ++i) {
 
-#pragma omp for
-    for (size_t i = 0; i < bodies.size(); ++i) {
-
-      glm::dvec3 distance_vector;
-      double squared_distance;
-      for (size_t j = 0; j < bodies.size(); ++j) {
-        if (i == j) {
-          continue;
-        }
-
-        // Precompute distance vector
-        distance_vector = bodies[j].pos - bodies[i].pos;
-        squared_distance =
-            glm::length2(distance_vector) + constants::squared_softening_factor;
-        // x*sqrt(x) should be faster than pow(x, 3/2)
-        force[i] += (bodies[j].mass * distance_vector) /
-                    (squared_distance * sqrt(squared_distance));
+    glm::dvec3 distance_vector;
+    double squared_distance;
+    for (size_t j = 0; j < bodies.size(); ++j) {
+      if (i == j) {
+        continue;
       }
 
-      // multipling once at the end is faster and also better for precision
-      force[i] *= constants::gravitational_constant_in_au3_per_kg_d2;
+      // Precompute distance vector
+      distance_vector = bodies[j].pos - bodies[i].pos;
+      squared_distance =
+          glm::length2(distance_vector) + constants::squared_softening_factor;
+      // x*sqrt(x) should be faster than pow(x, 3/2)
+      force[i] += (bodies[j].mass * distance_vector) /
+                  (squared_distance * sqrt(squared_distance));
     }
+
+    // multipling once at the end is faster and also better for precision
+    force[i] *= constants::gravitational_constant_in_au3_per_kg_d2;
   }
 
   return force;
@@ -125,12 +126,14 @@ double potential_energy(std::vector<space::CelestialBody> const &bodies) {
 
   for (size_t i = 0; i < bodies.size(); ++i) {
     for (size_t j = 0; j < i; ++j) {
+      glm::dvec3 diff = bodies[j].pos - bodies[i].pos;
+      double distance = glm::length(diff) + constants::softening_factor;
+
       double new_val = (constants::gravitational_constant_in_au3_per_kg_d2 *
                         bodies[i].mass * bodies[j].mass) /
-                       (glm::length(bodies[j].pos - bodies[i].pos));
+                       distance;
+
       potential_energy -= new_val;
-      // printf("i:%zu/%zu j:%zu, potential_energy is %f, new val is %f \n", i,
-      //        bodies.size(), j, potential_energy, new_val);
     }
   }
 
@@ -139,11 +142,7 @@ double potential_energy(std::vector<space::CelestialBody> const &bodies) {
 
 int main() {
   std::vector<space::CelestialBody> bodies =
-      read_planets_and_moons("planets_and_moons.csv");
-
-  std::vector<space::CelestialBody> asteroids =
-      read_asteroids("scenario1_without_planets_and_moons.csv");
-  bodies.insert(bodies.end(), asteroids.begin() + 1, asteroids.end());
+      read_bodies("planets_and_moons.csv");
 
   for (auto const &body : bodies) {
     if (body.name == "Pluto") {
@@ -154,7 +153,8 @@ int main() {
   // bodies = read_asteroids("scenario1_without_planets_and_moons.csv");
   // printf("bodies length %zu\n", bodies.size());
 
-  double time_step = 1.0 / 24.0;
+  int day_div = 100;
+  double time_step = 1.0 / day_div;
   std::vector<glm::dvec3> all_acc_old = get_gravitational_force(bodies);
 
   std::ofstream myfile;
@@ -163,7 +163,7 @@ int main() {
   for (int x = 0; x < int((10 * 365) / time_step); ++x) {
     // printf("%f\n", x * time_step);
 
-    if (x % 24 == 0) {
+    if (x % day_div == 0) {
       for (size_t i = 0; i < bodies.size(); ++i) {
         myfile << "(" << bodies[i].name.c_str() << "," << bodies[i].pos.x << ","
                << bodies[i].pos.y << ")";

@@ -24,6 +24,7 @@ public:
   std::string to_string();
 
   static CelestialBody from_state_vactor_string(const std::string &string);
+  static CelestialBody sun();
 
   // static CelestialBody from_orbital_elements(const std::string &string);
 };
