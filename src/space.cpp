@@ -118,7 +118,8 @@ DataRow DataRow::parse_asteroid(const std::string &line) {
   std::getline(ss, value, ',');
   row.name = value;
 
-  row.central_body = "Sun";
+  std::getline(ss, value, ',');
+  row.central_body = value;
 
   if (row.mass == 0.0) {
     if (row.albedo == 0.0) {

@@ -43,35 +43,27 @@ std::vector<space::CelestialBody> read_bodies(std::string path) {
       space::CelestialBody body =
           row.to_body(name_to_body.size(), name_to_body);
 
-      // printf("%s\n", line.c_str());
-      // printf("%f %f %f \n", body.pos.x, body.pos.y, body.pos.z);
-
       if (!body.name.empty()) {
         if (name_to_body.find(body.name) == name_to_body.end()) {
           name_to_body.insert({body.name, body});
         } else {
-          printf(
-              "Error: A bdoy with the name %s is already known (distance %f)\n",
-              body.name.c_str(),
-              glm::distance(body.pos, name_to_body.at(body.name).pos));
+          printf("Error: A bdoy with the name %s is already known (distance "
+                 "%f km)\n",
+                 body.name.c_str(),
+                 glm::distance(body.pos, name_to_body.at(body.name).pos) *
+                     constants::meters_per_astronomical_unit / 1000.0);
         }
       }
 
       for (const auto &entry : pos_to_body) {
-        if (glm::distance(entry.second.pos, body.pos) <= 6.68459e-7) {
+        if (glm::distance(entry.second.pos, body.pos) <=
+            10000 * constants::astronomical_units_per_meter) {
           printf("Error: A body at the position %f %f %f is already known (it "
                  "is called %s)\n",
                  body.pos.x, body.pos.y, body.pos.z, entry.second.name.c_str());
         }
       }
       pos_to_body.push_back({body.pos, body});
-
-      // if (pos_to_body.find(body.pos) == pos_to_body.end()) {
-      //   pos_to_body.insert({body.pos, body});
-      // } else {
-      //   printf("Error: A body at the position %f %f %f is already known\n",
-      //          body.pos.x, body.pos.y, body.pos.z);
-      // }
 
       bodies.push_back(body);
     }
@@ -141,8 +133,7 @@ double potential_energy(std::vector<space::CelestialBody> const &bodies) {
 }
 
 int main() {
-  std::vector<space::CelestialBody> bodies =
-      read_bodies("planets_and_moons.csv");
+  std::vector<space::CelestialBody> bodies = read_bodies("combined.csv");
 
   for (auto const &body : bodies) {
     if (body.name == "Pluto") {
@@ -153,7 +144,7 @@ int main() {
   // bodies = read_asteroids("scenario1_without_planets_and_moons.csv");
   // printf("bodies length %zu\n", bodies.size());
 
-  int day_div = 100;
+  int day_div = 240;
   double time_step = 1.0 / day_div;
   std::vector<glm::dvec3> all_acc_old = get_gravitational_force(bodies);
 
@@ -173,7 +164,7 @@ int main() {
           myfile << "\n";
         }
 
-        std::string to_watch = "Jupiter";
+        std::string to_watch = "Sun";
         if (bodies[i].name == to_watch) {
           //   printf("%s\n", bodies[i].to_string().c_str());
           double kinetic_energyx = kinetic_energy(bodies);
