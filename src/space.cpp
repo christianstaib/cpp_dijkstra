@@ -86,16 +86,16 @@ DataRow DataRow::parse_asteroid(const std::string &line) {
   row.semi_major_axis = std::stod(value);
 
   std::getline(ss, value, ',');
-  row.inclination = std::stod(value);
+  row.inclination = std::stod(value) * (M_PI / 180.0);
 
   std::getline(ss, value, ',');
-  row.longitude_of_the_ascending_node = std::stod(value);
+  row.longitude_of_the_ascending_node = std::stod(value) * (M_PI / 180.0);
 
   std::getline(ss, value, ',');
-  row.argument_of_periapsis = std::stod(value);
+  row.argument_of_periapsis = std::stod(value) * (M_PI / 180.0);
 
   std::getline(ss, value, ',');
-  row.mean_anomaly = std::stod(value);
+  row.mean_anomaly = std::stod(value) * (M_PI / 180.0);
 
   std::getline(ss, value, ',');
   row.epoch = std::stod(value);
@@ -123,8 +123,6 @@ DataRow DataRow::parse_asteroid(const std::string &line) {
 
   if (row.mass == 0.0) {
     if (row.albedo == 0.0) {
-      // printf("%s\n", line.c_str());
-      // printf("%s has no albedo\n", row.name.c_str());
       auto [min, max] = constants::geometric_albedo.at(row.type);
       std::random_device rd;
       std::mt19937 gen(rd());
@@ -133,7 +131,6 @@ DataRow DataRow::parse_asteroid(const std::string &line) {
     }
 
     if (row.diameter == 0.0) {
-      // printf("%s has no diameter\n", row.name.c_str());
       row.diameter = 1329 * (1 / sqrt(row.albedo)) * pow(10.0, -0.2 * row.h);
     }
 
@@ -149,10 +146,6 @@ DataRow DataRow::parse_asteroid(const std::string &line) {
 
     row.mass =
         (4.0 / 3.0) * M_PI * pow((row.diameter * 10e5) / 2, 3) * p / 10e5;
-    // printf("%s has no mass but now its %f\n", row.name.c_str(), row.mass);
-    // printf("albedo %f\n", row.albedo);
-    // printf("diameter %f\n", row.diameter);
-    // printf("\n");
   }
 
   return row;

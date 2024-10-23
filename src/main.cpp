@@ -41,6 +41,11 @@ std::vector<space::CelestialBody> read_bodies(std::string path) {
       space::CelestialBody body =
           row.to_body(name_to_body.size(), name_to_body);
 
+      if (body.name == "Earth") {
+        // 3,Earth,PLA,5.972185999999999813e+24,-0.1685246483858766631,0.9687833049070307956,-4.120490278477268624e-06,-0.01723415470267592939,-0.003007696701791743449,3.562616065704365793e-08
+        printf("Earth %f %f %f\n", body.pos.x, body.pos.y, body.pos.z);
+      }
+
       if (!body.name.empty()) {
         if (name_to_body.find(body.name) == name_to_body.end()) {
           name_to_body.insert({body.name, body});
@@ -76,7 +81,7 @@ void get_gravitational_force(std::vector<double> const &masses,
                              std::vector<glm::dvec3> const &velocities,
                              std::vector<glm::dvec3> &forces) {
 
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
   for (size_t i = 0; i < positions.size(); ++i) {
 
     glm::dvec3 distance_vector;
@@ -131,8 +136,8 @@ double potential_energy(std::vector<space::CelestialBody> const &bodies) {
 void write_data(std::ofstream &myfile, std::vector<glm::dvec3> const &positions,
                 std::vector<space::CelestialBody> const &bodies) {
   for (size_t i = 0; i < positions.size(); ++i) {
-    myfile << "(" << bodies[i].name.c_str() << "," << positions[i].x << ","
-           << positions[i].y << ")";
+    myfile << "(" << bodies[i].name.c_str() << "," << bodies[i].type.c_str()
+           << "," << positions[i].x << "," << positions[i].y << ")";
     if (i != positions.size() - 1) {
       myfile << ",";
     } else {
@@ -155,8 +160,7 @@ void write_data(std::ofstream &myfile, std::vector<glm::dvec3> const &positions,
 }
 
 int main() {
-  std::vector<space::CelestialBody> bodies =
-      read_bodies("planets_and_moons.csv");
+  std::vector<space::CelestialBody> bodies = read_bodies("combined.csv");
 
   // setup
   std::vector<double> masses;
@@ -178,11 +182,13 @@ int main() {
   myfile.open("data.txt");
 
   get_gravitational_force(masses, positions, velocities, old_forces);
-  for (int x = 0; x < int((1 * 365) / time_step); ++x) {
+  for (int x = 0; x < int((5 * 365) / time_step); ++x) {
     if (x % day_div == 0) {
       printf("day %f\n", x * time_step);
       write_data(myfile, positions, bodies);
     }
+
+    glm::dvec3 *p = positions.data();
 
     // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
     for (int i = 0; i < bodies.size(); ++i) {
