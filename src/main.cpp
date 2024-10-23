@@ -9,15 +9,13 @@
 #include <glm/detail/qualifier.hpp>
 #include <glm/ext/quaternion_geometric.hpp>
 #include <glm/ext/vector_double3.hpp>
+#include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 #include <glm/gtx/component_wise.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <omp.h>
 #include <unordered_map>
 #include <vector>
-
-#define GLM_ENABLE_EXPERIMENTAL
-#include "glm/gtx/hash.hpp"
 
 std::vector<space::CelestialBody> read_bodies(std::string path) {
   // Set up data structures needed for reading the asteroids.
@@ -73,34 +71,32 @@ std::vector<space::CelestialBody> read_bodies(std::string path) {
   return bodies;
 }
 
-std::vector<glm::dvec3>
-get_gravitational_force(const std::vector<space::CelestialBody> &bodies) {
-  std::vector<glm::dvec3> force(bodies.size(), glm::dvec3(0));
+void get_gravitational_force(std::vector<double> const &masses,
+                             std::vector<glm::dvec3> const &positions,
+                             std::vector<glm::dvec3> const &velocities,
+                             std::vector<glm::dvec3> &forces) {
 
 #pragma omp parallel for
-  for (size_t i = 0; i < bodies.size(); ++i) {
+  for (size_t i = 0; i < positions.size(); ++i) {
 
     glm::dvec3 distance_vector;
     double squared_distance;
-    for (size_t j = 0; j < bodies.size(); ++j) {
+    for (size_t j = 0; j < positions.size(); ++j) {
       if (i == j) {
         continue;
       }
 
       // Precompute distance vector
-      distance_vector = bodies[j].pos - bodies[i].pos;
+      distance_vector = positions[j] - positions[i];
       squared_distance =
           glm::length2(distance_vector) + constants::squared_softening_factor;
       // x*sqrt(x) should be faster than pow(x, 3/2)
-      force[i] += (bodies[j].mass * distance_vector) /
-                  (squared_distance * sqrt(squared_distance));
+      forces[i] += (masses[j] * distance_vector) /
+                   (squared_distance * sqrt(squared_distance));
     }
 
-    // multipling once at the end is faster and also better for precision
-    force[i] *= constants::gravitational_constant_in_au3_per_kg_d2;
+    forces[i] *= constants::gravitational_constant_in_au3_per_kg_d2;
   }
-
-  return force;
 }
 
 double kinetic_energy(std::vector<space::CelestialBody> const &bodies) {
@@ -132,84 +128,80 @@ double potential_energy(std::vector<space::CelestialBody> const &bodies) {
   return potential_energy;
 }
 
-int main() {
-  std::vector<space::CelestialBody> bodies = read_bodies("combined.csv");
-
-  for (auto const &body : bodies) {
-    if (body.name == "Pluto") {
-      printf("found Pluto\n");
+void write_data(std::ofstream &myfile, std::vector<glm::dvec3> const &positions,
+                std::vector<space::CelestialBody> const &bodies) {
+  for (size_t i = 0; i < positions.size(); ++i) {
+    myfile << "(" << bodies[i].name.c_str() << "," << positions[i].x << ","
+           << positions[i].y << ")";
+    if (i != positions.size() - 1) {
+      myfile << ",";
+    } else {
+      myfile << "\n";
     }
+
+    // std::string to_watch = "Sun";
+    // if (bodies[i].name == to_watch) {
+    //   //   printf("%s\n", bodies[i].to_string().c_str());
+    //   double kinetic_energyx = kinetic_energy(bodies);
+    //   double potential_energyx = potential_energy(bodies);
+    //   double energy = kinetic_energyx + potential_energyx;
+    //   double ratio = (2 * kinetic_energyx) / glm::abs(potential_energyx);
+    //   printf("energy at day %f is %f, kinetic_energy is %f, "
+    //          "potential_energy is %f, ratio is %f\n",
+    //          x * time_step, energy, kinetic_energyx, potential_energyx,
+    //          ratio);
+    // }
+  }
+}
+
+int main() {
+  std::vector<space::CelestialBody> bodies =
+      read_bodies("planets_and_moons.csv");
+
+  // setup
+  std::vector<double> masses;
+  std::vector<glm::dvec3> positions;
+  std::vector<glm::dvec3> velocities;
+  std::vector<glm::dvec3> forces;
+  std::vector<glm::dvec3> old_forces;
+  for (auto const &body : bodies) {
+    masses.push_back(body.mass);
+    positions.push_back(body.pos);
+    velocities.push_back(body.vel);
+    forces.push_back(glm::dvec3(0));
+    old_forces.push_back(glm::dvec3(0));
   }
 
-  // bodies = read_asteroids("scenario1_without_planets_and_moons.csv");
-  // printf("bodies length %zu\n", bodies.size());
-
-  int day_div = 240;
+  int day_div = 24;
   double time_step = 1.0 / day_div;
-  std::vector<glm::dvec3> all_acc_old = get_gravitational_force(bodies);
-
   std::ofstream myfile;
   myfile.open("data.txt");
 
-  for (int x = 0; x < int((10 * 365) / time_step); ++x) {
-    // printf("%f\n", x * time_step);
-
+  get_gravitational_force(masses, positions, velocities, old_forces);
+  for (int x = 0; x < int((1 * 365) / time_step); ++x) {
     if (x % day_div == 0) {
-      for (size_t i = 0; i < bodies.size(); ++i) {
-        myfile << "(" << bodies[i].name.c_str() << "," << bodies[i].pos.x << ","
-               << bodies[i].pos.y << ")";
-        if (i != bodies.size() - 1) {
-          myfile << ",";
-        } else {
-          myfile << "\n";
-        }
-
-        std::string to_watch = "Sun";
-        if (bodies[i].name == to_watch) {
-          //   printf("%s\n", bodies[i].to_string().c_str());
-          double kinetic_energyx = kinetic_energy(bodies);
-          double potential_energyx = potential_energy(bodies);
-          double energy = kinetic_energyx + potential_energyx;
-          double ratio = (2 * kinetic_energyx) / glm::abs(potential_energyx);
-          printf("energy at day %f is %f, kinetic_energy is %f, "
-                 "potential_energy is %f, ratio is %f\n",
-                 x * time_step, energy, kinetic_energyx, potential_energyx,
-                 ratio);
-          // printf("%s at day %f: %f %f\n", to_watch.c_str(), x * time_step,
-          //        bodies[i].pos.x, bodies[i].pos.y);
-        }
-      }
+      printf("day %f\n", x * time_step);
+      write_data(myfile, positions, bodies);
     }
 
+    // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
     for (int i = 0; i < bodies.size(); ++i) {
-      auto &body = bodies[i];
-      auto acc_old = all_acc_old[i];
-
-      // Half-step position update
-      body.pos += body.vel * time_step + 0.5 * acc_old * time_step * time_step;
+      positions[i] += velocities[i] * time_step +
+                      0.5 * old_forces[i] * time_step * time_step;
     }
 
-    // Compute new accelerations based on the current positions
-    std::vector<glm::dvec3> all_acc_new = get_gravitational_force(bodies);
+    // a_(i + 1)
+    get_gravitational_force(masses, positions, velocities, forces);
 
+    // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
     for (int i = 0; i < bodies.size(); ++i) {
-      auto &body = bodies[i];
-      auto acc_old = all_acc_old[i];
-      auto acc_new = all_acc_new[i]; // Corrected to use the new acceleration
-
-      // Half-step velocity update
-      body.vel += 0.5 * (acc_old + acc_new) *
-                  time_step; // Correctly using both old and new accelerations
+      velocities[i] += 0.5 * (old_forces[i] + forces[i]) * time_step;
     }
 
-    // Update the old accelerations for the next iteration
-    all_acc_old = all_acc_new;
+    old_forces = forces;
   }
 
   myfile.close();
-
-  for (auto const &body : bodies) {
-  }
 
   return 0;
 }
