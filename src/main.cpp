@@ -160,7 +160,7 @@ void write_data(std::ofstream &myfile, std::vector<glm::dvec3> const &positions,
 }
 
 int main() {
-  std::vector<space::CelestialBody> bodies = read_bodies("combined.csv");
+  std::vector<space::CelestialBody> bodies = read_bodies("data/combined.csv");
 
   // setup
   std::vector<double> masses;
