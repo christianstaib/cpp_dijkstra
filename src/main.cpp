@@ -215,7 +215,7 @@ int main() {
           0.5 * (old_forces[body_idx] + forces[body_idx]) * time_step;
     }
 
-    old_forces = forces;
+    std::swap(forces, old_forces);
   }
 
   myfile.close();
