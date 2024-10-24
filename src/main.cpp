@@ -42,7 +42,6 @@ std::vector<space::CelestialBody> read_bodies(std::string path) {
           row.to_body(name_to_body.size(), name_to_body);
 
       if (body.name == "Earth") {
-        // 3,Earth,PLA,5.972185999999999813e+24,-0.1685246483858766631,0.9687833049070307956,-4.120490278477268624e-06,-0.01723415470267592939,-0.003007696701791743449,3.562616065704365793e-08
         printf("Earth %f %f %f\n", body.pos.x, body.pos.y, body.pos.z);
       }
 
@@ -76,17 +75,16 @@ std::vector<space::CelestialBody> read_bodies(std::string path) {
   return bodies;
 }
 
-void get_gravitational_force(std::vector<double> const &masses,
-                             std::vector<glm::dvec3> const &positions,
-                             std::vector<glm::dvec3> const &velocities,
-                             std::vector<glm::dvec3> &forces) {
+void update_gravitational_force(double *masses, glm::dvec3 *positions,
+                                glm::dvec3 *velocities, glm::dvec3 *forces,
+                                size_t num_bodies) {
 
 #pragma omp parallel for schedule(static)
-  for (size_t i = 0; i < positions.size(); ++i) {
+  for (size_t i = 0; i < num_bodies; ++i) {
 
     glm::dvec3 distance_vector;
     double squared_distance;
-    for (size_t j = 0; j < positions.size(); ++j) {
+    for (size_t j = 0; j < num_bodies; ++j) {
       if (i == j) {
         continue;
       }
@@ -104,26 +102,29 @@ void get_gravitational_force(std::vector<double> const &masses,
   }
 }
 
-double kinetic_energy(std::vector<space::CelestialBody> const &bodies) {
+double get_kinetic_energy(double *masses, glm::dvec3 *velocities,
+                          size_t num_bodies) {
   double kinetic_energy = 0.0;
 
-  for (auto const &body : bodies) {
-    kinetic_energy += 0.5 * body.mass * glm::length2(body.vel);
+  for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
+    kinetic_energy +=
+        0.5 * masses[body_idx] * glm::length2(velocities[body_idx]);
   }
 
   return kinetic_energy;
 }
 
-double potential_energy(std::vector<space::CelestialBody> const &bodies) {
+double get_potential_energy(double *masses, glm::dvec3 *positions,
+                            size_t num_bodies) {
   double potential_energy = 0.0;
 
-  for (size_t i = 0; i < bodies.size(); ++i) {
+  for (size_t i = 0; i < num_bodies; ++i) {
     for (size_t j = 0; j < i; ++j) {
-      glm::dvec3 diff = bodies[j].pos - bodies[i].pos;
+      glm::dvec3 diff = positions[j] - positions[i];
       double distance = glm::length(diff) + constants::softening_factor;
 
       double new_val = (constants::gravitational_constant_in_au3_per_kg_d2 *
-                        bodies[i].mass * bodies[j].mass) /
+                        masses[i] * masses[j]) /
                        distance;
 
       potential_energy -= new_val;
@@ -133,12 +134,12 @@ double potential_energy(std::vector<space::CelestialBody> const &bodies) {
   return potential_energy;
 }
 
-void write_data(std::ofstream &myfile, std::vector<glm::dvec3> const &positions,
+void write_data(std::ofstream &myfile, glm::dvec3 *positions,
                 std::vector<space::CelestialBody> const &bodies) {
-  for (size_t i = 0; i < positions.size(); ++i) {
+  for (size_t i = 0; i < bodies.size(); ++i) {
     myfile << "(" << bodies[i].name.c_str() << "," << bodies[i].type.c_str()
            << "," << positions[i].x << "," << positions[i].y << ")";
-    if (i != positions.size() - 1) {
+    if (i != bodies.size() - 1) {
       myfile << ",";
     } else {
       myfile << "\n";
@@ -160,48 +161,58 @@ void write_data(std::ofstream &myfile, std::vector<glm::dvec3> const &positions,
 }
 
 int main() {
-  std::vector<space::CelestialBody> bodies = read_bodies("data/combined.csv");
+  std::vector<space::CelestialBody> bodies =
+      read_bodies("data/planets_and_moons.csv");
+  size_t num_bodies = bodies.size();
 
   // setup
-  std::vector<double> masses;
-  std::vector<glm::dvec3> positions;
-  std::vector<glm::dvec3> velocities;
-  std::vector<glm::dvec3> forces;
-  std::vector<glm::dvec3> old_forces;
-  for (auto const &body : bodies) {
-    masses.push_back(body.mass);
-    positions.push_back(body.pos);
-    velocities.push_back(body.vel);
-    forces.push_back(glm::dvec3(0));
-    old_forces.push_back(glm::dvec3(0));
+  double *masses = new double[num_bodies];
+  glm::dvec3 *positions = new glm::dvec3[num_bodies];
+  glm::dvec3 *velocities = new glm::dvec3[num_bodies];
+  glm::dvec3 *forces = new glm::dvec3[num_bodies];
+  glm::dvec3 *old_forces = new glm::dvec3[num_bodies];
+  for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
+    auto body = bodies[body_idx];
+    masses[body_idx] = body.mass;
+    positions[body_idx] = body.pos;
+    velocities[body_idx] = body.vel;
   }
 
   int day_div = 24;
   double time_step = 1.0 / day_div;
+  int num_iterations = int((5 * 365) / time_step);
   std::ofstream myfile;
   myfile.open("data.txt");
 
-  get_gravitational_force(masses, positions, velocities, old_forces);
-  for (int x = 0; x < int((5 * 365) / time_step); ++x) {
-    if (x % day_div == 0) {
-      printf("day %f\n", x * time_step);
+  update_gravitational_force(masses, positions, velocities, old_forces,
+                             num_bodies);
+
+  for (int iteration = 0; iteration < num_iterations; ++iteration) {
+    if (iteration % day_div == 0) {
+      printf("day %f\n", iteration * time_step);
+      double kinetic_energy =
+          get_kinetic_energy(masses, velocities, num_bodies);
+      double potential_energy =
+          get_potential_energy(masses, positions, num_bodies);
+      printf("kinetic_energy %f\n", kinetic_energy);
+      printf("potential_energy %f\n", potential_energy);
       write_data(myfile, positions, bodies);
     }
 
-    glm::dvec3 *p = positions.data();
-
     // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
-    for (int i = 0; i < bodies.size(); ++i) {
-      positions[i] += velocities[i] * time_step +
-                      0.5 * old_forces[i] * time_step * time_step;
+    for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
+      positions[body_idx] += velocities[body_idx] * time_step +
+                             0.5 * old_forces[body_idx] * time_step * time_step;
     }
 
     // a_(i + 1)
-    get_gravitational_force(masses, positions, velocities, forces);
+    update_gravitational_force(masses, positions, velocities, forces,
+                               num_bodies);
 
     // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
-    for (int i = 0; i < bodies.size(); ++i) {
-      velocities[i] += 0.5 * (old_forces[i] + forces[i]) * time_step;
+    for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
+      velocities[body_idx] +=
+          0.5 * (old_forces[body_idx] + forces[body_idx]) * time_step;
     }
 
     old_forces = forces;
