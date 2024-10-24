@@ -220,5 +220,11 @@ int main() {
 
   myfile.close();
 
+  free(masses);
+  free(positions);
+  free(velocities);
+  free(forces);
+  free(old_forces);
+
   return 0;
 }
