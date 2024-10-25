@@ -1,13 +1,17 @@
 
 #include "octree.hpp"
+
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <glm/ext/vector_double3.hpp>
 #include <glm/geometric.hpp>
 #include <glm/gtx/norm.hpp>
 #include <ranges>
 #include <vector>
+
+#include "constants.hpp"
 
 bool octree::Node::is_leaf() { return first_child == 0; }
 
@@ -16,13 +20,10 @@ bool octree::Node::is_branch() { return first_child != 0; }
 bool octree::Node::is_empty() { return mass == 0.0; }
 
 bool octree::Cube::contains(glm::dvec3 pos) {
-  const double epsilon = 1e-5; // Small tolerance for floating-point precision
-  return (center.x - size - epsilon <= pos.x) &&
-         (pos.x < center.x + size + epsilon) &&
-         (center.y - size - epsilon <= pos.y) &&
-         (pos.y < center.y + size + epsilon) &&
-         (center.z - size - epsilon <= pos.z) &&
-         (pos.z < center.z + size + epsilon);
+  const double epsilon = 1e-5;  // Small tolerance for floating-point precision
+  return (center.x - size - epsilon <= pos.x) && (pos.x < center.x + size + epsilon) &&
+         (center.y - size - epsilon <= pos.y) && (pos.y < center.y + size + epsilon) &&
+         (center.z - size - epsilon <= pos.z) && (pos.z < center.z + size + epsilon);
 }
 
 int octree::Cube::find_subcube(glm::dvec3 pos) {
@@ -44,8 +45,7 @@ int octree::Cube::find_subcube(glm::dvec3 pos) {
 }
 
 octree::Node::Node(octree::Cube cube, int next_pre_order)
-    : first_child(0), cube(cube), next_pre_order(next_pre_order),
-      mass_center(glm::dvec3(0.0)), mass(0.0) {}
+    : first_child(0), cube(cube), next_pre_order(next_pre_order), mass_center(glm::dvec3(0.0)), mass(0.0) {}
 
 octree::Cube octree::Cube::create_subcube(int quadrant) {
   octree::Cube subcube = octree::Cube{center, size / 2};
@@ -60,6 +60,14 @@ octree::Octree::Octree(glm::dvec3 center, double size) {
   octree::Cube root{center, size};
   nodes.push_back(Node(root, 0));
 };
+
+void octree::Octree::clear(glm::dvec3 center, double size) {
+  nodes.clear();
+  parents.clear();
+
+  octree::Cube root{center, size};
+  nodes.push_back(Node(root, 0));
+}
 
 std::array<octree::Cube, 8> octree::Cube::subdivide() {
   std::array<octree::Cube, 8> subcubes;
@@ -77,13 +85,11 @@ int octree::Octree::subdivide(int node) {
   int first_child = nodes.size();
   nodes[node].first_child = first_child;
 
-  int nexts_pre_order[8] = {first_child + 1, first_child + 2,
-                            first_child + 3, first_child + 4,
-                            first_child + 5, first_child + 6,
-                            first_child + 7, nodes[node].next_pre_order};
+  int nexts_pre_order[8] = {first_child + 1, first_child + 2, first_child + 3, first_child + 4,
+                            first_child + 5, first_child + 6, first_child + 7, nodes[node].next_pre_order};
 
   std::array<octree::Cube, 8> subcubes = nodes[node].cube.subdivide();
-  for (int i = 0; i < 8; ++i) {
+  for (size_t i = 0; i < 8; ++i) {
     nodes.push_back(octree::Node(subcubes[i], nexts_pre_order[i]));
   }
   return first_child;
@@ -92,8 +98,7 @@ int octree::Octree::subdivide(int node) {
 void octree::Octree::insert(glm::dvec3 new_pos, double new_mass) {
   int node_idx = 0;
   while (nodes[node_idx].is_branch()) {
-    node_idx = nodes[node_idx].first_child +
-               nodes[node_idx].cube.find_subcube(new_pos);
+    node_idx = nodes[node_idx].first_child + nodes[node_idx].cube.find_subcube(new_pos);
   }
 
   // if there is no body in the node, set it
@@ -118,45 +123,33 @@ void octree::Octree::insert(glm::dvec3 new_pos, double new_mass) {
       octree::Node *node = &nodes[first_child + offset_new];
       node->mass_center = new_pos;
       node->mass = new_mass;
-      // if (!node->cube.contains(new_pos)) {
-      //   printf("illegal1\n");
-      // }
 
       node = &nodes[first_child + offset_old];
       node->mass_center = old_pos;
       node->mass = old_mass;
-      // if (!node->cube.contains(nodes[node_idx].mass_center)) {
-      //   printf("illegal2\n");
-      // }
+
       break;
     }
   }
 }
 
 void octree::Octree::propagate() {
-  for (auto &node : std::ranges::views::reverse(this->parents)) {
-    int first_child = this->nodes[node].first_child;
+  for (auto &parent : std::ranges::views::reverse(parents)) {
+    int first_child = nodes[parent].first_child;
 
-    for (int child_offset = 0; child_offset < 8; ++child_offset) {
-      nodes[node].mass += nodes[first_child + child_offset].mass;
+    nodes[parent].mass = 0;
+    nodes[parent].mass_center = glm::dvec3(0.0);
+    for (size_t child_offset = 0; child_offset < 8; ++child_offset) {
+      nodes[parent].mass += nodes[first_child + child_offset].mass;
+      nodes[parent].mass_center +=
+          nodes[first_child + child_offset].mass_center * nodes[first_child + child_offset].mass;
     }
-
-    nodes[node].mass_center = glm::dvec3(0.0);
-    for (int child_offset = 0; child_offset < 8; ++child_offset) {
-      nodes[node].mass_center += nodes[first_child + child_offset].mass_center *
-                                 nodes[first_child + child_offset].mass;
-    }
-    nodes[node].mass_center /= nodes[node].mass;
+    nodes[parent].mass_center /= nodes[parent].mass;
   }
 }
 
 glm::dvec3 octree::Octree::acc(glm::dvec3 pos, double theata) {
   glm::dvec3 acc(0.0);
-
-  double gravitational_constant = 6.67430e-11;
-  double conversion_factor = pow(86400.0, 2.0) / pow(149597870700.0, 3.0);
-  gravitational_constant *= conversion_factor;
-  double softening_factor = 1e-11;
 
   int node_idx = 0;
 
@@ -167,10 +160,14 @@ glm::dvec3 octree::Octree::acc(glm::dvec3 pos, double theata) {
     double s = 2 * node.cube.size;
 
     if (node.is_leaf() || (s / d) < theata) {
-      acc += node.mass * ((node.mass_center - pos) /
-                          pow(glm::length2(node.mass_center - pos) +
-                                  softening_factor * softening_factor,
-                              (3.0 / 2.0)));
+      // Precompute distance vector
+      auto distance_vector = node.mass_center - pos;
+      auto squared_distance = glm::length2(distance_vector) + constants::squared_softening_factor;
+      // x*sqrt(x) should be faster than pow(x, 3/2)
+      acc += (node.mass * distance_vector) / (squared_distance * sqrt(squared_distance));
+
+      // acc += (d * node.mass_center) /
+      //        (pow(d * d + constants::softening_factor, 3.0 / 2.0));
 
       if (node.next_pre_order == 0) {
         break;
@@ -181,5 +178,5 @@ glm::dvec3 octree::Octree::acc(glm::dvec3 pos, double theata) {
     }
   }
 
-  return acc * gravitational_constant;
+  return acc * constants::gravitational_constant_in_au3_per_kg_d2;
 }

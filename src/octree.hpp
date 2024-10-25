@@ -2,7 +2,7 @@
 
 #include <array>
 #include <glm/ext/vector_double3.hpp>
-#include <glm/glm.hpp> // Include GLM for vec3
+#include <glm/glm.hpp>  // Include GLM for vec3
 #include <vector>
 
 // origin is bottom left behind
@@ -10,7 +10,7 @@
 
 namespace octree {
 class Cube {
-public:
+ public:
   glm::dvec3 center;
   double size;
 
@@ -23,12 +23,12 @@ public:
 };
 
 class Node {
-public:
+ public:
   int first_child;
   Cube cube;
   int next_pre_order;
 
-  glm::dvec3 mass_center; // Center of mass as a 3D vector
+  glm::dvec3 mass_center;  // Center of mass as a 3D vector
   double mass;
 
   Node(Cube cube, int next_pre_order);
@@ -38,15 +38,16 @@ public:
 };
 
 class Octree {
-public:
+ public:
   std::vector<Node> nodes;
-  std::vector<int> parents; // parent of node[i] is nodes[parents[(i - 1)/8]]
+  std::vector<int> parents;  // parent of node[i] is nodes[parents[(i - 1)/8]]
 
   Octree(glm::dvec3 center, double size);
+  void clear(glm::dvec3 center, double size);
   void propagate();
   glm::dvec3 acc(glm::dvec3 pos, double theta);
   void insert(glm::dvec3 pos, double mass);
   int subdivide(int node);
 };
 
-} // namespace octree
+}  // namespace octree
