@@ -229,7 +229,7 @@ int main() {
   int day_div = 24;
   double simulation_step_size = 1.0 / day_div;
   double visualization_step_size = 1.0;
-  int num_iterations = int((1 * 365) / simulation_step_size);
+  int num_iterations = int((12 * 365) / simulation_step_size);
 
   std::ofstream myfile;
   myfile.open("data.txt");
@@ -247,9 +247,9 @@ int main() {
 
     // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
     update_positions(num_bodies, velocities, forces, positions, simulation_step_size, &min_edge, &max_edge);
-    rebuild_tree(num_bodies, positions, masses, &min_edge, &max_edge, test);
 
     // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
+    rebuild_tree(num_bodies, positions, masses, &min_edge, &max_edge, test);
 #pragma omp parallel
     {
       glm::dvec3 new_force(0.0);

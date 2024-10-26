@@ -13,20 +13,22 @@
 
 #include "constants.hpp"
 
-bool octree::Node::is_leaf() { return first_child == 0; }
+namespace octree {
 
-bool octree::Node::is_branch() { return first_child != 0; }
+bool Node::is_leaf() { return first_child == 0; }
 
-bool octree::Node::is_empty() { return mass == 0.0; }
+bool Node::is_branch() { return first_child != 0; }
 
-bool octree::Cube::contains(glm::dvec3 pos) {
+bool Node::is_empty() { return mass == 0.0; }
+
+bool Cube::contains(glm::dvec3 pos) {
   const double epsilon = 1e-5;  // Small tolerance for floating-point precision
   return (center.x - size - epsilon <= pos.x) && (pos.x < center.x + size + epsilon) &&
          (center.y - size - epsilon <= pos.y) && (pos.y < center.y + size + epsilon) &&
          (center.z - size - epsilon <= pos.z) && (pos.z < center.z + size + epsilon);
 }
 
-int octree::Cube::find_subcube(glm::dvec3 pos) {
+int Cube::find_subcube(glm::dvec3 pos) {
   int subcube = 0;
 
   if (pos.x > center.x) {
@@ -44,11 +46,11 @@ int octree::Cube::find_subcube(glm::dvec3 pos) {
   return subcube;
 }
 
-octree::Node::Node(octree::Cube cube, int next_pre_order)
+Node::Node(octree::Cube cube, int next_pre_order)
     : first_child(0), cube(cube), next_pre_order(next_pre_order), mass_center(glm::dvec3(0.0)), mass(0.0) {}
 
-octree::Cube octree::Cube::create_subcube(int quadrant) {
-  octree::Cube subcube = octree::Cube{center, size / 2};
+Cube Cube::create_subcube(int quadrant) {
+  Cube subcube = octree::Cube{center, size / 2};
   subcube.center.x += ((float)(quadrant & 0b1) - 0.5) * size;
   subcube.center.y += ((float)((quadrant >> 1) & 0b1) - 0.5) * size;
   subcube.center.z += ((float)((quadrant >> 2) & 0b1) - 0.5) * size;
@@ -56,12 +58,12 @@ octree::Cube octree::Cube::create_subcube(int quadrant) {
   return subcube;
 }
 
-octree::Octree::Octree(glm::dvec3 center, double size) {
-  octree::Cube root{center, size};
+Octree::Octree(glm::dvec3 center, double size) {
+  Cube root{center, size};
   nodes.push_back(Node(root, 0));
 };
 
-void octree::Octree::clear(glm::dvec3 center, double size) {
+void Octree::clear(glm::dvec3 center, double size) {
   nodes.clear();
   parents.clear();
 
@@ -69,8 +71,8 @@ void octree::Octree::clear(glm::dvec3 center, double size) {
   nodes.push_back(Node(root, 0));
 }
 
-std::array<octree::Cube, 8> octree::Cube::subdivide() {
-  std::array<octree::Cube, 8> subcubes;
+std::array<Cube, 8> Cube::subdivide() {
+  std::array<Cube, 8> subcubes;
 
   // Iterate over all 8 possible quadrants (0 to 7)
   for (int quadrant = 0; quadrant < 8; ++quadrant) {
@@ -80,7 +82,7 @@ std::array<octree::Cube, 8> octree::Cube::subdivide() {
   return subcubes;
 }
 
-int octree::Octree::subdivide(int node) {
+int Octree::subdivide(int node) {
   parents.push_back(node);
   int first_child = nodes.size();
   nodes[node].first_child = first_child;
@@ -88,14 +90,14 @@ int octree::Octree::subdivide(int node) {
   int nexts_pre_order[8] = {first_child + 1, first_child + 2, first_child + 3, first_child + 4,
                             first_child + 5, first_child + 6, first_child + 7, nodes[node].next_pre_order};
 
-  std::array<octree::Cube, 8> subcubes = nodes[node].cube.subdivide();
+  std::array<Cube, 8> subcubes = nodes[node].cube.subdivide();
   for (size_t i = 0; i < 8; ++i) {
-    nodes.push_back(octree::Node(subcubes[i], nexts_pre_order[i]));
+    nodes.push_back(Node(subcubes[i], nexts_pre_order[i]));
   }
   return first_child;
 }
 
-void octree::Octree::insert(glm::dvec3 new_pos, double new_mass) {
+void Octree::insert(glm::dvec3 new_pos, double new_mass) {
   int node_idx = 0;
   while (nodes[node_idx].is_branch()) {
     node_idx = nodes[node_idx].first_child + nodes[node_idx].cube.find_subcube(new_pos);
@@ -120,7 +122,7 @@ void octree::Octree::insert(glm::dvec3 new_pos, double new_mass) {
     if (offset_new == offset_old) {
       node_idx = first_child + offset_new;
     } else {
-      octree::Node *node = &nodes[first_child + offset_new];
+      Node *node = &nodes[first_child + offset_new];
       node->mass_center = new_pos;
       node->mass = new_mass;
 
@@ -133,7 +135,7 @@ void octree::Octree::insert(glm::dvec3 new_pos, double new_mass) {
   }
 }
 
-void octree::Octree::propagate() {
+void Octree::propagate() {
   for (auto &parent : std::ranges::views::reverse(parents)) {
     int first_child = nodes[parent].first_child;
 
@@ -148,13 +150,13 @@ void octree::Octree::propagate() {
   }
 }
 
-glm::dvec3 octree::Octree::acc(glm::dvec3 pos, double theata) {
+glm::dvec3 Octree::acc(glm::dvec3 pos, double theata) {
   glm::dvec3 acc(0.0);
 
   int node_idx = 0;
 
   while (true) {
-    octree::Node &node = nodes[node_idx];
+    Node &node = nodes[node_idx];
 
     double d = glm::distance(node.mass_center, pos);
     double s = 2 * node.cube.size;
@@ -180,3 +182,4 @@ glm::dvec3 octree::Octree::acc(glm::dvec3 pos, double theata) {
 
   return acc * constants::gravitational_constant_in_au3_per_kg_d2;
 }
+}  // namespace octree
