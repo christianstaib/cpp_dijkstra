@@ -12,9 +12,7 @@
 #include <glm/ext/vector_double3.hpp>
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
-#include <glm/gtx/component_wise.hpp>
 #include <glm/gtx/quaternion.hpp>
-#include <numeric>
 #include <unordered_map>
 #include <vector>
 
