@@ -26,7 +26,7 @@ inline constexpr double gravitational_constant_in_au3_per_kg_d2 =
 
 /// Softening factor used in the force calculation to avoid numerical
 /// instabilities when two points are very close to each other.
-inline constexpr double softening_factor = 1e-100;
+inline constexpr double softening_factor = 1e-11;
 
 /// Squared softening factor. See softening_factor for more information.
 inline constexpr double squared_softening_factor = softening_factor * softening_factor;
