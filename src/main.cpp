@@ -225,7 +225,7 @@ int main() {
     max_edge = max(max_edge, positions[body_idx]);
   }
 
-  double theta = 1.05;
+  double theta = 0.0;  // 1.05;
   int day_div = 24;
   double simulation_step_size = 1.0 / day_div;
   double visualization_step_size = 1.0;
