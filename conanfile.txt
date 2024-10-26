@@ -1,7 +1,7 @@
 [requires]
 nlohmann_json/3.11.3
 zpp_bits/4.4.20
-glm/1.0.1
+glm/0.9.9
 
 [generators]
 CMakeDeps
