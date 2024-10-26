@@ -20,6 +20,8 @@
 #include "octree.hpp"
 #include "space.hpp"
 
+#define GLM_ENABLE_EXPERIMENTAL
+
 std::vector<space::CelestialBody> read_bodies(std::string path) {
   // Set up data structures needed for reading the asteroids.
   space::CelestialBody sun = space::CelestialBody::sun();
