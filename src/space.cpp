@@ -1,5 +1,7 @@
+#define GLM_ENABLE_EXPERIMENTAL
+
 #include "space.hpp"
-#include "constants.hpp"
+
 #include <cmath>
 #include <cstdio>
 #include <glm/fwd.hpp>
@@ -9,6 +11,8 @@
 #include <random>
 #include <sstream>
 #include <string>
+
+#include "constants.hpp"
 
 namespace space {
 
@@ -60,15 +64,13 @@ CelestialBody CelestialBody::from_state_vactor_string(const std::string &line) {
 
 std::string CelestialBody::to_string() {
   std::stringstream ss;
-  ss << std::setprecision(std::numeric_limits<double>::max_digits10) << id
-     << "," << name << "," << type << "," << mass << "," << pos.x << ","
-     << pos.y << "," << pos.z << "," << vel.x << "," << vel.y << "," << vel.z;
+  ss << std::setprecision(std::numeric_limits<double>::max_digits10) << id << "," << name << "," << type << "," << mass
+     << "," << pos.x << "," << pos.y << "," << pos.z << "," << vel.x << "," << vel.y << "," << vel.z;
   return ss.str();
 }
 
 space::CelestialBody CelestialBody::sun() {
-  return CelestialBody{
-      0, "Sun", "STA", constants::sun_mass, glm::dvec3(0.0), glm::dvec3(0.0)};
+  return CelestialBody{0, "Sun", "STA", constants::sun_mass, glm::dvec3(0.0), glm::dvec3(0.0)};
 }
 
 // Function to parse a single row of CSV data and return a DataRow object
@@ -144,8 +146,7 @@ DataRow DataRow::parse_asteroid(const std::string &line) {
       p = 5.32;
     }
 
-    row.mass =
-        (4.0 / 3.0) * M_PI * pow((row.diameter * 10e5) / 2, 3) * p / 10e5;
+    row.mass = (4.0 / 3.0) * M_PI * pow((row.diameter * 10e5) / 2, 3) * p / 10e5;
   }
 
   return row;
@@ -203,20 +204,16 @@ DataRow DataRow::parse_planet_moon(const std::string &line) {
   return row;
 }
 
-CelestialBody DataRow::to_body(
-    int id,
-    std::unordered_map<std::string, space::CelestialBody> const &bodies) {
+CelestialBody DataRow::to_body(int id, std::unordered_map<std::string, space::CelestialBody> const &bodies) {
   CelestialBody body;
 
   space::CelestialBody central_body_body = bodies.at(central_body);
 
   // 1) Calculate mean anomaly m_t
   double m_t =
-      mean_anomaly +
-      (constants::sun_reference_epoch - epoch) *
-          std::sqrt((constants::gravitational_constant_in_au3_per_kg_d2 *
-                     central_body_body.mass) /
-                    pow(semi_major_axis, 3));
+      mean_anomaly + (constants::sun_reference_epoch - epoch) *
+                         std::sqrt((constants::gravitational_constant_in_au3_per_kg_d2 * central_body_body.mass) /
+                                   pow(semi_major_axis, 3));
   // printf("m_t %f\n", m_t);
 
   // 2) Solve Kepler’s equation for eccentric anomaly e_t
@@ -227,30 +224,26 @@ CelestialBody DataRow::to_body(
     e_t -= f / f_prime;
   }
   // 3) Calculate the true anomaly
-  double true_anomaly = 2.0 * atan2(sqrt(1 + eccentricity) * sin(e_t / 2),
-                                    sqrt(1 - eccentricity) * cos(e_t / 2));
+  double true_anomaly = 2.0 * atan2(sqrt(1 + eccentricity) * sin(e_t / 2), sqrt(1 - eccentricity) * cos(e_t / 2));
   // printf("true_anomaly %f\n", true_anomaly);
 
   // 4) Calculate the distance to the central to_body
-  double distance_to_the_central_body =
-      semi_major_axis * (1 - eccentricity * cos(e_t));
+  double distance_to_the_central_body = semi_major_axis * (1 - eccentricity * cos(e_t));
   // printf("distance_to_the_central_body %f\n", distance_to_the_central_body);
 
   // 5) Calculate the position ~o(t) and velocity ˙~o(t) vectors in the orbital
   // frame
   glm::dvec3 pos(cos(true_anomaly), sin(true_anomaly), 0);
   pos *= distance_to_the_central_body;
-  glm::dvec3 vel(-sin(e_t), sqrt(1 - eccentricity * eccentricity) * cos(e_t),
-                 0);
-  vel *= sqrt(constants::gravitational_constant_in_au3_per_kg_d2 *
-              central_body_body.mass * semi_major_axis) /
+  glm::dvec3 vel(-sin(e_t), sqrt(1 - eccentricity * eccentricity) * cos(e_t), 0);
+  vel *= sqrt(constants::gravitational_constant_in_au3_per_kg_d2 * central_body_body.mass * semi_major_axis) /
          distance_to_the_central_body;
 
   // this is correct
 
   // 6)
-  double lo = argument_of_periapsis;           // lower omega
-  double uo = longitude_of_the_ascending_node; // uper omega
+  double lo = argument_of_periapsis;            // lower omega
+  double uo = longitude_of_the_ascending_node;  // uper omega
   double i = inclination;
   double r11 = cos(lo) * cos(uo) - sin(lo) * cos(i) * sin(uo);
   double r12 = -(sin(lo) * cos(uo) + cos(lo) * cos(i) * sin(uo));
@@ -258,9 +251,8 @@ CelestialBody DataRow::to_body(
   double r22 = cos(lo) * cos(i) * cos(uo) - sin(lo) * sin(uo);
   double r31 = sin(lo) * sin(i);
   double r32 = cos(lo) * sin(i);
-  glm::dmat3 r(glm::vec3(r11, r12, 0.0f), glm::vec3(r21, r22, 0.0f),
-               glm::vec3(r31, r32, 0.0f));
-  pos = pos * r; // WHY matrix on right side????? TODO
+  glm::dmat3 r(glm::vec3(r11, r12, 0.0f), glm::vec3(r21, r22, 0.0f), glm::vec3(r31, r32, 0.0f));
+  pos = pos * r;  // WHY matrix on right side????? TODO
   vel = vel * r;
 
   // 7.)
@@ -277,4 +269,4 @@ CelestialBody DataRow::to_body(
   return body;
 }
 
-} // namespace space
+}  // namespace space
