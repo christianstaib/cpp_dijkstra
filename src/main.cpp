@@ -2,6 +2,8 @@
 
 #include <omp.h>
 
+#include <glm/ext/scalar_constants.hpp>
+
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include <chrono>
@@ -149,9 +151,8 @@ void loging(std::vector<space::CelestialBody> &bodies, size_t &num_bodies, doubl
     double pe = get_potential_energy(num_bodies, masses, positions);
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     double ms_per_it =
-        ((double)std::chrono::duration_cast<std::chrono::microseconds>(end - *begin).count() / (double)day_div) /
-        1000.0;
-    *begin = std::chrono::steady_clock::now();
+        ((double)std::chrono::duration_cast<std::chrono::microseconds>(end - *begin).count() / iteration) / 1000.0;
+    // *begin = std::chrono::steady_clock::now();
     printf("day %f %f %f %f ms/it\n", iteration * time_step, ke, pe, ms_per_it);
     write_data(myfile, positions, bodies);
   }
@@ -202,6 +203,38 @@ void rebuild_tree(size_t num_bodies, glm::dvec3 *positions, double *masses, glm:
   test.propagate();
 }
 
+/// Naive approach to get gravitional force on all bodies in (Kg*AU)/d^2.
+glm::dvec3 get_gravitational_force(size_t body_idx_want_force, size_t num_bodies, glm::dvec3 *positions,
+                                   double *masses) {
+  long double x = 0;
+  long double y = 0;
+  long double z = 0;
+
+  glm::dvec3 distance_vector;
+  double squared_distance;
+
+  for (size_t j = 0; j < num_bodies; ++j) {
+    // Check body_idx_want_force == j can be skiped as distance_vector will be zero in this case
+
+    // Precompute distance vector
+    distance_vector = positions[j] - positions[body_idx_want_force];
+    squared_distance = glm::length2(distance_vector) + constants::squared_softening_factor;
+    // x*sqrt(x) should be faster than pow(x, 3/2)
+    x += (masses[j] * distance_vector.x) / (squared_distance * sqrt(squared_distance));
+    y += (masses[j] * distance_vector.y) / (squared_distance * sqrt(squared_distance));
+    z += (masses[j] * distance_vector.z) / (squared_distance * sqrt(squared_distance));
+  }
+
+  x *= constants::gravitational_constant_in_au3_per_kg_d2;
+  y *= constants::gravitational_constant_in_au3_per_kg_d2;
+  z *= constants::gravitational_constant_in_au3_per_kg_d2;
+
+  glm::dvec3 force((double)x, (double)y, (double)z);
+
+  // multipling once at the end is faster and also better for precision
+  return force;
+}
+
 int main() {
   std::vector<space::CelestialBody> bodies = read_bodies("data/combined.csv");
   size_t num_bodies = bodies.size();
@@ -225,7 +258,8 @@ int main() {
     max_edge = max(max_edge, positions[body_idx]);
   }
 
-  double theta = 0.0;  // 1.05;
+  double theta = 1.05;
+  double squared_theta = theta * theta;
   int day_div = 24;
   double simulation_step_size = 1.0 / day_div;
   double visualization_step_size = 1.0;
@@ -238,7 +272,7 @@ int main() {
   rebuild_tree(num_bodies, positions, masses, &min_edge, &max_edge, test);
 #pragma omp parallel for schedule(static)
   for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
-    forces[body_idx] = test.acc(positions[body_idx], theta);
+    forces[body_idx] = test.get_force(positions[body_idx], theta);
   }
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
@@ -255,7 +289,9 @@ int main() {
       glm::dvec3 new_force(0.0);
 #pragma omp for simd schedule(static)
       for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
-        new_force = test.acc(positions[body_idx], theta);
+        new_force = test.get_force(positions[body_idx], squared_theta);
+        // glm::dvec3 naive_foce = get_gravitational_force(body_idx, num_bodies, positions, masses);
+        // printf("%f\n", glm::distance(new_force, naive_foce));
         velocities[body_idx] += 0.5 * (forces[body_idx] + new_force) * simulation_step_size;
         forces[body_idx] = new_force;
       }

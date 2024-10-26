@@ -12,7 +12,8 @@ namespace octree {
 class Cube {
  public:
   glm::dvec3 center;
-  double size;
+  double half_edge_length;
+  double squared_edge_length;
 
   // only gives a hint in which direction the subcube is. is not guranteed that
   // pos fits
@@ -45,7 +46,7 @@ class Octree {
   Octree(glm::dvec3 center, double size);
   void clear(glm::dvec3 center, double size);
   void propagate();
-  glm::dvec3 acc(glm::dvec3 pos, double theta);
+  glm::dvec3 get_force(glm::dvec3 pos, double theta);
   void insert(glm::dvec3 pos, double mass);
   int subdivide(int node);
 };
