@@ -264,7 +264,7 @@ int main() {
   int num_iterations = int((12 * 365) / step_size);
 
   std::ofstream myfile;
-  myfile.open("data.txt");
+  myfile.open("data/data.txt");
 
   octree::Octree test(glm::dvec3(0.0), 0.0);
   rebuild_tree(num_bodies, positions, masses, &min_edge, &max_edge, test);
