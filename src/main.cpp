@@ -192,7 +192,7 @@ void update_positions(size_t num_bodies, glm::dvec3 *velocities, glm::dvec3 *for
 
 void rebuild_tree(size_t num_bodies, glm::dvec3 *positions, double *masses, glm::dvec3 *min_edge, glm::dvec3 *max_edge,
                   octree::Octree &test) {
-  glm::dvec3 center = (*min_edge + *max_edge) * 1.05;
+  glm::dvec3 center = (*min_edge + *max_edge) * 0.5;
   glm::dvec3 diff = *max_edge - center;
   double size = std::max(std::max(diff.x, diff.y), diff.z);
 
@@ -248,7 +248,6 @@ int main() {
 
   glm::dvec3 min_edge(std::numeric_limits<double>::max());
   glm::dvec3 max_edge(std::numeric_limits<double>::min());
-  glm::dvec3 center(0.0);
 
   for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
     masses[body_idx] = bodies[body_idx].mass;
@@ -261,9 +260,8 @@ int main() {
   double theta = 1.05;
   double squared_theta = theta * theta;
   int day_div = 24;
-  double simulation_step_size = 1.0 / day_div;
-  double visualization_step_size = 1.0;
-  int num_iterations = int((12 * 365) / simulation_step_size);
+  double step_size = 1.0 / day_div;
+  int num_iterations = int((12 * 365) / step_size);
 
   std::ofstream myfile;
   myfile.open("data.txt");
@@ -277,10 +275,10 @@ int main() {
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   for (int iteration = 0; iteration < num_iterations; ++iteration) {
-    loging(bodies, num_bodies, masses, positions, velocities, day_div, simulation_step_size, myfile, iteration, &begin);
+    loging(bodies, num_bodies, masses, positions, velocities, day_div, step_size, myfile, iteration, &begin);
 
     // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
-    update_positions(num_bodies, velocities, forces, positions, simulation_step_size, &min_edge, &max_edge);
+    update_positions(num_bodies, velocities, forces, positions, step_size, &min_edge, &max_edge);
 
     // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
     rebuild_tree(num_bodies, positions, masses, &min_edge, &max_edge, test);
@@ -292,7 +290,7 @@ int main() {
         new_force = test.get_force(positions[body_idx], squared_theta);
         // glm::dvec3 naive_foce = get_gravitational_force(body_idx, num_bodies, positions, masses);
         // printf("%f\n", glm::distance(new_force, naive_foce));
-        velocities[body_idx] += 0.5 * (forces[body_idx] + new_force) * simulation_step_size;
+        velocities[body_idx] += 0.5 * (forces[body_idx] + new_force) * step_size;
         forces[body_idx] = new_force;
       }
     }

@@ -15,6 +15,8 @@ class Cube {
   double half_edge_length;
   double squared_edge_length;
 
+  Cube();
+  Cube(glm::dvec3 center, double half_edge_length);
   // only gives a hint in which direction the subcube is. is not guranteed that
   // pos fits
   int find_subcube(glm::dvec3 pos);

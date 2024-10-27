@@ -29,6 +29,13 @@ bool Cube::contains(glm::dvec3 pos) {
          (center.z - half_edge_length - epsilon <= pos.z) && (pos.z < center.z + half_edge_length + epsilon);
 }
 
+Cube::Cube() : center(glm::dvec3(0)), half_edge_length(0.0), squared_edge_length(0.0) {}
+
+Cube::Cube(glm::dvec3 center, double half_edge_length)
+    : center(center),
+      half_edge_length(half_edge_length),
+      squared_edge_length((2 * half_edge_length) * (2 * half_edge_length)) {}
+
 int Cube::find_subcube(glm::dvec3 pos) {
   int subcube = 0;
 
@@ -51,7 +58,7 @@ Node::Node(octree::Cube cube, int next_pre_order)
     : first_child(0), cube(cube), next_pre_order(next_pre_order), mass_center(glm::dvec3(0.0)), mass(0.0) {}
 
 Cube Cube::create_subcube(int quadrant) {
-  Cube subcube = octree::Cube{center, half_edge_length / 2, half_edge_length * half_edge_length};
+  Cube subcube = octree::Cube(center, half_edge_length / 2);
   subcube.center.x += ((float)(quadrant & 0b1) - 0.5) * half_edge_length;
   subcube.center.y += ((float)((quadrant >> 1) & 0b1) - 0.5) * half_edge_length;
   subcube.center.z += ((float)((quadrant >> 2) & 0b1) - 0.5) * half_edge_length;
@@ -68,7 +75,7 @@ void Octree::clear(glm::dvec3 center, double half_edge_length) {
   nodes.clear();
   parents.clear();
 
-  octree::Cube root{center, half_edge_length, (2 * half_edge_length) * (2 * half_edge_length)};
+  octree::Cube root(center, half_edge_length);
   nodes.push_back(Node(root, 0));
 }
 
