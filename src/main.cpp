@@ -240,19 +240,19 @@ int main() {
 
   // setup
   double *masses = new double[num_bodies];
-  glm::dvec3 *positions = new glm::dvec3[num_bodies];
-  glm::dvec3 *velocities = new glm::dvec3[num_bodies];
-  glm::dvec3 *forces = new glm::dvec3[num_bodies];
+  glm::dvec3 *position = new glm::dvec3[num_bodies];
+  glm::dvec3 *velocity = new glm::dvec3[num_bodies];
+  glm::dvec3 *old_force = new glm::dvec3[num_bodies];
 
   glm::dvec3 min_edge(std::numeric_limits<double>::max());
   glm::dvec3 max_edge(std::numeric_limits<double>::min());
 
   for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
     masses[body_idx] = bodies[body_idx].mass;
-    positions[body_idx] = bodies[body_idx].pos;
-    velocities[body_idx] = bodies[body_idx].vel;
-    min_edge = min(min_edge, positions[body_idx]);
-    max_edge = max(max_edge, positions[body_idx]);
+    position[body_idx] = bodies[body_idx].pos;
+    velocity[body_idx] = bodies[body_idx].vel;
+    min_edge = min(min_edge, position[body_idx]);
+    max_edge = max(max_edge, position[body_idx]);
   }
 
   double theta = 1.05;
@@ -265,31 +265,30 @@ int main() {
   myfile.open("data/data.txt");
 
   octree::Octree test(glm::dvec3(0.0), 0.0);
-  rebuild_tree(num_bodies, positions, masses, &min_edge, &max_edge, test);
+  rebuild_tree(num_bodies, position, masses, &min_edge, &max_edge, test);
 #pragma omp parallel for schedule(static)
   for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
-    forces[body_idx] = test.get_force(positions[body_idx], theta);
+    old_force[body_idx] = test.get_force(position[body_idx], theta);
   }
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   for (int iteration = 0; iteration < num_iterations; ++iteration) {
-    loging(bodies, num_bodies, masses, positions, velocities, day_div, step_size, myfile, iteration, &begin);
+    loging(bodies, num_bodies, masses, position, velocity, day_div, step_size, myfile, iteration, &begin);
 
     // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
 #pragma omp parallel
     {
-      update_positions(num_bodies, velocities, forces, positions, step_size, &min_edge, &max_edge);
+      update_positions(num_bodies, velocity, old_force, position, step_size, &min_edge, &max_edge);
 
 #pragma omp single
       // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
-      rebuild_tree(num_bodies, positions, masses, &min_edge, &max_edge, test);
+      rebuild_tree(num_bodies, position, masses, &min_edge, &max_edge, test);
 
-      glm::dvec3 new_force(0.0);
-#pragma omp for simd schedule(static)
+#pragma omp for simd schedule(guided)
       for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
-        new_force = test.get_force(positions[body_idx], squared_theta);
-        velocities[body_idx] += 0.5 * (forces[body_idx] + new_force) * step_size;
-        forces[body_idx] = new_force;
+        glm::dvec3 new_force = test.get_force(position[body_idx], squared_theta);
+        velocity[body_idx] += 0.5 * (old_force[body_idx] + new_force) * step_size;
+        old_force[body_idx] = new_force;
       }
     }
   }
@@ -297,9 +296,9 @@ int main() {
   myfile.close();
 
   free(masses);
-  free(positions);
-  free(velocities);
-  free(forces);
+  free(position);
+  free(velocity);
+  free(old_force);
 
   return 0;
 }
