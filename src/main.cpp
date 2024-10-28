@@ -162,32 +162,30 @@ void loging(std::vector<space::CelestialBody> &bodies, size_t &num_bodies, doubl
 // Needs to be run in a parallel section
 void update_positions(size_t num_bodies, glm::dvec3 *velocities, glm::dvec3 *forces, glm::dvec3 *positions,
                       double time_step, glm::dvec3 *min_edge, glm::dvec3 *max_edge) {
-#pragma omp parallel
-  {
 #pragma omp critical
-    {
-      *min_edge = glm::dvec3(std::numeric_limits<double>::max());
-      *max_edge = glm::dvec3(std::numeric_limits<double>::min());
-    }
+  {
+    *min_edge = glm::dvec3(std::numeric_limits<double>::max());
+    *max_edge = glm::dvec3(std::numeric_limits<double>::min());
+  }
 
-    glm::dvec3 local_min_edge = glm::dvec3(std::numeric_limits<double>::max());
-    glm::dvec3 local_max_edge = glm::dvec3(std::numeric_limits<double>::min());
+  glm::dvec3 local_min_edge = glm::dvec3(std::numeric_limits<double>::max());
+  glm::dvec3 local_max_edge = glm::dvec3(std::numeric_limits<double>::min());
 
 #pragma omp for simd schedule(static)
-    for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
-      positions[body_idx] += velocities[body_idx] * time_step + 0.5 * forces[body_idx] * time_step * time_step;
+  for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
+    positions[body_idx] += velocities[body_idx] * time_step + 0.5 * forces[body_idx] * time_step * time_step;
 
-      local_min_edge = min(local_min_edge, positions[body_idx]);
-      local_max_edge = max(local_max_edge, positions[body_idx]);
-    }
-
-    // better use custom reduction?
-#pragma omp critical
-    {
-      *min_edge = min(*min_edge, local_min_edge);
-      *max_edge = max(*max_edge, local_max_edge);
-    }
+    local_min_edge = min(local_min_edge, positions[body_idx]);
+    local_max_edge = max(local_max_edge, positions[body_idx]);
   }
+
+  // better use custom reduction?
+#pragma omp critical
+  {
+    *min_edge = min(*min_edge, local_min_edge);
+    *max_edge = max(*max_edge, local_max_edge);
+  }
+#pragma omp barrier
 }
 
 void rebuild_tree(size_t num_bodies, glm::dvec3 *positions, double *masses, glm::dvec3 *min_edge, glm::dvec3 *max_edge,
@@ -204,8 +202,8 @@ void rebuild_tree(size_t num_bodies, glm::dvec3 *positions, double *masses, glm:
 }
 
 /// Naive approach to get gravitional force on all bodies in (Kg*AU)/d^2.
-glm::dvec3 get_gravitational_force(size_t body_idx_want_force, size_t num_bodies, glm::dvec3 *positions,
-                                   double *masses) {
+glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bodies, glm::dvec3 *positions,
+                                      double *masses) {
   long double x = 0;
   long double y = 0;
   long double z = 0;
@@ -229,7 +227,7 @@ glm::dvec3 get_gravitational_force(size_t body_idx_want_force, size_t num_bodies
   y *= constants::gravitational_constant_in_au3_per_kg_d2;
   z *= constants::gravitational_constant_in_au3_per_kg_d2;
 
-  glm::dvec3 force((double)x, (double)y, (double)z);
+  glm::dvec3 force(x, y, z);
 
   // multipling once at the end is faster and also better for precision
   return force;
@@ -278,18 +276,18 @@ int main() {
     loging(bodies, num_bodies, masses, positions, velocities, day_div, step_size, myfile, iteration, &begin);
 
     // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
-    update_positions(num_bodies, velocities, forces, positions, step_size, &min_edge, &max_edge);
-
-    // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
-    rebuild_tree(num_bodies, positions, masses, &min_edge, &max_edge, test);
 #pragma omp parallel
     {
+      update_positions(num_bodies, velocities, forces, positions, step_size, &min_edge, &max_edge);
+
+#pragma omp single
+      // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
+      rebuild_tree(num_bodies, positions, masses, &min_edge, &max_edge, test);
+
       glm::dvec3 new_force(0.0);
 #pragma omp for simd schedule(static)
       for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
         new_force = test.get_force(positions[body_idx], squared_theta);
-        // glm::dvec3 naive_foce = get_gravitational_force(body_idx, num_bodies, positions, masses);
-        // printf("%f\n", glm::distance(new_force, naive_foce));
         velocities[body_idx] += 0.5 * (forces[body_idx] + new_force) * step_size;
         forces[body_idx] = new_force;
       }
