@@ -1,6 +1,5 @@
+#include <utility>
 #define GLM_ENABLE_EXPERIMENTAL
-
-#include "octree.hpp"
 
 #include <array>
 #include <cmath>
@@ -13,6 +12,7 @@
 #include <vector>
 
 #include "constants.hpp"
+#include "octree.hpp"
 
 namespace octree {
 
@@ -143,6 +143,8 @@ void Octree::insert(glm::dvec3 new_pos, double new_mass) {
   }
 }
 
+void rebuild_tree(size_t num_bodies, glm::dvec3 *positions, double *masses) {}
+
 void Octree::propagate() {
   for (auto &parent : std::ranges::views::reverse(parents)) {
     int first_child = nodes[parent].first_child;
@@ -170,9 +172,11 @@ glm::dvec3 Octree::get_force(glm::dvec3 pos, double squared_theta) {
     // pow(s, 2) / pow(e, 2) < pow(t, 2) <=> s / e < t
     if (node.is_leaf() || (node.cube.squared_edge_length / squared_length_subforce) < squared_theta) {
       subforce = node.mass_center - pos;
-      squared_length_subforce += +constants::squared_softening_factor;
-      magnitude = node.mass / (squared_length_subforce * sqrt(squared_length_subforce));
-      force += subforce * magnitude;
+      if (squared_length_subforce) {
+        squared_length_subforce += +constants::squared_softening_factor;
+        magnitude = node.mass / (squared_length_subforce * sqrt(squared_length_subforce));
+        force += subforce * magnitude;
+      }
 
       if (node.next_pre_order == 0) break;
       node_idx = node.next_pre_order;

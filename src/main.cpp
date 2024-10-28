@@ -6,6 +6,7 @@
 
 #define GLM_ENABLE_EXPERIMENTAL
 
+#include <CLI/CLI.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
@@ -17,6 +18,8 @@
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <indicators/cursor_control.hpp>
+#include <indicators/progress_bar.hpp>
 #include <unordered_map>
 #include <vector>
 
@@ -144,16 +147,16 @@ void write_data(std::ofstream &myfile, glm::dvec3 *positions, std::vector<space:
 }
 
 void loging(std::vector<space::CelestialBody> &bodies, size_t &num_bodies, double *masses, glm::dvec3 *positions,
-            glm::dvec3 *velocities, int &day_div, double &time_step, std::ofstream &myfile, int &iteration,
+            glm::dvec3 *velocities, int &vis_step_size, double &time_step, std::ofstream &myfile, int &iteration,
             std::chrono::steady_clock::time_point *begin) {
-  if (iteration % day_div == 0) {
+  if (iteration % vis_step_size == 0) {
     double ke = get_kinetic_energy(num_bodies, masses, velocities);
     double pe = get_potential_energy(num_bodies, masses, positions);
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     double ms_per_it =
         ((double)std::chrono::duration_cast<std::chrono::microseconds>(end - *begin).count() / iteration) / 1000.0;
     // *begin = std::chrono::steady_clock::now();
-    printf("day %f %f %f %f ms/it\n", iteration * time_step, ke, pe, ms_per_it);
+    // printf("day %f %f %f %f ms/it\n", iteration * time_step, ke, pe, ms_per_it);
     write_data(myfile, positions, bodies);
   }
 }
@@ -173,6 +176,7 @@ void update_positions(size_t num_bodies, glm::dvec3 *velocities, glm::dvec3 *for
 
 #pragma omp for simd schedule(static)
   for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
+    // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
     positions[body_idx] += velocities[body_idx] * time_step + 0.5 * forces[body_idx] * time_step * time_step;
 
     local_min_edge = min(local_min_edge, positions[body_idx]);
@@ -233,7 +237,62 @@ glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bod
   return force;
 }
 
-int main() {
+int main(int argc, char **argv) {
+  // ./simulate --file scenario1.csv --dt 1h --t_end 12y --vs 2d --vs_dir sim_s1 --theta 1.05
+  CLI::App app("Gravity Simulator");
+  // add version output
+  app.set_version_flag("--version", std::string(CLI11_VERSION));
+  std::string bodies_file;
+  CLI::Option *opt0 = app.add_option("--file", bodies_file, "File name");
+  opt0->required();
+
+  int step_size_hours{1};
+  CLI::Option *opt1 = app.add_option("--dt", step_size_hours, "Step size in hours");
+
+  int vis_step_size_hours{24};
+  CLI::Option *opt4 = app.add_option("--vs", step_size_hours, "Visualization step size in hours");
+
+  int t_end{1};
+  CLI::Option *opt2 = app.add_option("--t_end", t_end, "Length of simulation in years");
+
+  double theta{1.0};
+  CLI::Option *opt3 = app.add_option("--theta", theta, "Barnes-Hut theta");
+
+  CLI11_PARSE(app, argc, argv);
+
+  std::cout << "Working on file: " << bodies_file << "\n";
+  std::cout << "Step size in hours: " << step_size_hours << "\n";
+  std::cout << "Vis step size in hours: " << vis_step_size_hours << "\n";
+  std::cout << "Length of simulation in year: " << t_end << "\n";
+  std::cout << "Barnes-Hut theta: " << theta << "\n";
+  std::cout << "\n";
+
+  //
+
+  double squared_theta = theta * theta;
+
+  double step_size_days = 1.0 / (24 * step_size_hours);
+  printf("%f", step_size_days);
+
+  int num_iterations = int((t_end * 365) / step_size_days);
+
+  // Hide cursor
+  using namespace indicators;
+  show_console_cursor(true);
+
+  indicators::ProgressBar bar{option::BarWidth{50},
+                              option::Start{" ["},
+                              option::Fill{"█"},
+                              option::Lead{"█"},
+                              option::Remainder{"-"},
+                              option::End{"]"},
+                              option::PrefixText{"Simulation"},
+                              option::ShowElapsedTime{true},
+                              option::ShowRemainingTime{true},
+                              indicators::option::MaxProgress{num_iterations}};
+
+  //
+
   std::vector<space::CelestialBody> bodies = read_bodies("data/combined.csv");
   size_t num_bodies = bodies.size();
   printf("there are %zu bodies\n", num_bodies);
@@ -255,12 +314,6 @@ int main() {
     max_edge = max(max_edge, position[body_idx]);
   }
 
-  double theta = 1.05;
-  double squared_theta = theta * theta;
-  int day_div = 24;
-  double step_size = 1.0 / day_div;
-  int num_iterations = int((12 * 365) / step_size);
-
   std::ofstream myfile;
   myfile.open("data/data.txt");
 
@@ -273,21 +326,24 @@ int main() {
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   for (int iteration = 0; iteration < num_iterations; ++iteration) {
-    loging(bodies, num_bodies, masses, position, velocity, day_div, step_size, myfile, iteration, &begin);
+    bar.tick();
+    loging(bodies, num_bodies, masses, position, velocity, vis_step_size_hours, step_size_days, myfile, iteration,
+           &begin);
 
-    // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
 #pragma omp parallel
     {
-      update_positions(num_bodies, velocity, old_force, position, step_size, &min_edge, &max_edge);
+      update_positions(num_bodies, velocity, old_force, position, step_size_days, &min_edge, &max_edge);
 
 #pragma omp single
-      // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
       rebuild_tree(num_bodies, position, masses, &min_edge, &max_edge, test);
 
+      // get_force performs a tree traversal with variable execution times,
+      // therfore use schedule(guided) workload balancing
 #pragma omp for simd schedule(guided)
       for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
         glm::dvec3 new_force = test.get_force(position[body_idx], squared_theta);
-        velocity[body_idx] += 0.5 * (old_force[body_idx] + new_force) * step_size;
+        // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
+        velocity[body_idx] += 0.5 * (old_force[body_idx] + new_force) * step_size_days;
         old_force[body_idx] = new_force;
       }
     }
