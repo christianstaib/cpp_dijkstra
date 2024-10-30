@@ -40,6 +40,15 @@ class Node {
   bool is_empty();
 };
 
+struct VecTreeNode {
+  Cube cube;
+  std::vector<std::pair<glm::dvec3, double>> data;
+  std::array<VecTreeNode, 8> *children;
+
+  void split();
+  static VecTreeNode create_root(size_t num_bodies, glm::dvec3 *positions, double *masses, Cube cube);
+};
+
 class Octree {
  public:
   std::vector<Node> nodes;

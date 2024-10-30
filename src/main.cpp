@@ -3,6 +3,7 @@
 #include <omp.h>
 
 #include <glm/ext/scalar_constants.hpp>
+#include <random>
 
 #define GLM_ENABLE_EXPERIMENTAL
 
@@ -148,15 +149,15 @@ void write_data(std::ofstream &myfile, glm::dvec3 *positions, std::vector<space:
 
 void loging(std::vector<space::CelestialBody> &bodies, size_t &num_bodies, double *masses, glm::dvec3 *positions,
             glm::dvec3 *velocities, int &vis_step_size, double &time_step, std::ofstream &myfile, int &iteration,
-            std::chrono::steady_clock::time_point *begin) {
+            std::chrono::steady_clock::time_point *begin, indicators::ProgressBar &bar) {
   if (iteration % vis_step_size == 0) {
-    double ke = get_kinetic_energy(num_bodies, masses, velocities);
-    double pe = get_potential_energy(num_bodies, masses, positions);
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     double ms_per_it =
         ((double)std::chrono::duration_cast<std::chrono::microseconds>(end - *begin).count() / iteration) / 1000.0;
-    // *begin = std::chrono::steady_clock::now();
-    // printf("day %f %f %f %f ms/it\n", iteration * time_step, ke, pe, ms_per_it);
+    bar.set_option(indicators::option::PostfixText{std::to_string(ms_per_it) + "ms/it"});
+
+    double ke = get_kinetic_energy(num_bodies, masses, velocities);
+    double pe = get_potential_energy(num_bodies, masses, positions);
     write_data(myfile, positions, bodies);
   }
 }
@@ -272,7 +273,6 @@ int main(int argc, char **argv) {
   double squared_theta = theta * theta;
 
   double step_size_days = 1.0 / (24 * step_size_hours);
-  printf("%f", step_size_days);
 
   int num_iterations = int((t_end * 365) / step_size_days);
 
@@ -280,20 +280,15 @@ int main(int argc, char **argv) {
   using namespace indicators;
   show_console_cursor(true);
 
-  indicators::ProgressBar bar{option::BarWidth{50},
-                              option::Start{" ["},
-                              option::Fill{"█"},
-                              option::Lead{"█"},
-                              option::Remainder{"-"},
-                              option::End{"]"},
-                              option::PrefixText{"Simulation"},
-                              option::ShowElapsedTime{true},
-                              option::ShowRemainingTime{true},
-                              indicators::option::MaxProgress{num_iterations}};
+  indicators::ProgressBar bar{option::BarWidth{50}, option::PrefixText{"Simulation"}, option::ShowElapsedTime{true},
+                              option::ShowRemainingTime{true}, indicators::option::MaxProgress{num_iterations}};
 
   //
 
   std::vector<space::CelestialBody> bodies = read_bodies("data/combined.csv");
+  // shfule to break order for better tree inserting performance
+  auto rng = std::default_random_engine{};
+  std::shuffle(std::begin(bodies), std::end(bodies), rng);
   size_t num_bodies = bodies.size();
   printf("there are %zu bodies\n", num_bodies);
 
@@ -325,10 +320,18 @@ int main(int argc, char **argv) {
   }
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+  octree::VecTreeNode root = octree::VecTreeNode::create_root(num_bodies, position, masses, test.nodes[0].cube);
+  printf("root size is %f\n", root.cube.half_edge_length);
+  root.split();
+
+  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+  double ms_per_it = ((double)std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()) / 1000.0;
+  printf("building tree took %f ms\n", ms_per_it);
+
   for (int iteration = 0; iteration < num_iterations; ++iteration) {
     bar.tick();
     loging(bodies, num_bodies, masses, position, velocity, vis_step_size_hours, step_size_days, myfile, iteration,
-           &begin);
+           &begin, bar);
 
 #pragma omp parallel
     {

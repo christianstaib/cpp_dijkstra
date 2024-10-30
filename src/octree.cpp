@@ -1,3 +1,4 @@
+#include <random>
 #include <utility>
 #define GLM_ENABLE_EXPERIMENTAL
 
@@ -143,7 +144,85 @@ void Octree::insert(glm::dvec3 new_pos, double new_mass) {
   }
 }
 
-void rebuild_tree(size_t num_bodies, glm::dvec3 *positions, double *masses) {}
+void VecTreeNode::split() {
+#pragma omp declare reduction( \
+        merge : std::vector<VecTreeNode> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+
+  std::vector<VecTreeNode> to_split;
+
+  for (int i = 0; i < 8; ++i) {
+    to_split.push_back((*children)[i]);
+  }
+
+  while (!to_split.empty()) {
+    VecTreeNode node = to_split.back();
+    to_split.pop_back();
+
+    node.children = new std::array<VecTreeNode, 8>();
+
+    std::array<Cube, 8> cubes = node.cube.subdivide();
+    for (int i = 0; i < 8; ++i) {
+      (*node.children)[i].cube = cubes[i];
+    }
+
+#pragma omp parallel
+    {
+      std::array<std::vector<std::pair<glm::dvec3, double>>, 8> local_data;
+#pragma omp for schedule(static)
+      for (int i = 0; i < node.data.size(); ++i) {
+        size_t idx = node.cube.find_subcube(node.data[i].first);
+        local_data[idx].push_back({node.data[i]});
+      }
+
+#pragma omp critical
+      {
+        for (int i = 0; i < 8; ++i) {
+          (*node.children)[i].data.insert((*node.children)[i].data.end(), local_data[i].begin(), local_data[i].end());
+        }
+      }
+    }
+
+    for (int i = 0; i < 8; ++i) {
+      if ((*node.children)[i].data.size() > 100) {
+        to_split.push_back((*node.children)[i]);
+      }
+    }
+
+    node.data.clear();
+  }
+}
+
+VecTreeNode VecTreeNode::create_root(size_t num_bodies, glm::dvec3 *positions, double *masses, Cube cube) {
+  VecTreeNode root{};
+  root.cube = cube;
+  root.children = new std::array<VecTreeNode, 8>();
+
+  std::array<Cube, 8> cubes = root.cube.subdivide();
+  for (int i = 0; i < 8; ++i) {
+    (*root.children)[i].cube = cubes[i];
+  }
+
+#pragma omp parallel
+  {
+    std::array<std::vector<std::pair<glm::dvec3, double>>, 8> local_data;
+#pragma omp for schedule(guided)
+    for (int i = 0; i < num_bodies; ++i) {
+      size_t idx = root.cube.find_subcube(positions[i]);
+      local_data[idx].push_back({positions[i], masses[i]});
+    }
+
+#pragma omp critical
+    {
+      for (int i = 0; i < 8; ++i) {
+        (*root.children)[i].data.insert((*root.children)[i].data.end(), local_data[i].begin(), local_data[i].end());
+      }
+    }
+  }
+
+  root.data.clear();
+
+  return root;
+}
 
 void Octree::propagate() {
   for (auto &parent : std::ranges::views::reverse(parents)) {
