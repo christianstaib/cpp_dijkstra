@@ -321,12 +321,15 @@ int main(int argc, char **argv) {
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   octree::VecTreeNode root = octree::VecTreeNode::create_root(num_bodies, position, masses, test.nodes[0].cube);
-  printf("root size is %f\n", root.cube.half_edge_length);
-  root.split();
+  printf("root size is %f\n", test.nodes[0].cube.half_edge_length);
+  root.split_all();
+  // printf("root size is %f\n", root.cube.half_edge_length);
+  // root.split();
 
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
   double ms_per_it = ((double)std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()) / 1000.0;
   printf("building tree took %f ms\n", ms_per_it);
+  printf("there are %d elements\n", root.count());
 
   for (int iteration = 0; iteration < num_iterations; ++iteration) {
     bar.tick();

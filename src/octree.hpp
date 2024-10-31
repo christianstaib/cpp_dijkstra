@@ -45,7 +45,9 @@ struct VecTreeNode {
   std::vector<std::pair<glm::dvec3, double>> data;
   std::array<VecTreeNode, 8> *children;
 
-  void split();
+  void split_all();
+  std::vector<VecTreeNode *> split();
+  int count();
   static VecTreeNode create_root(size_t num_bodies, glm::dvec3 *positions, double *masses, Cube cube);
 };
 
