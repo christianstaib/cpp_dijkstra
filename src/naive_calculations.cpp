@@ -55,3 +55,36 @@ void naive_calculations::update_forces(size_t num_bodies, double *masses, glm::d
     forces[i] *= constants::gravitational_constant_in_au3_per_kg_d2;
   }
 }
+
+/// Naive approach to get gravitional force on all bodies in (Kg*AU)/d^2.
+glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bodies, glm::dvec3 *positions,
+                                      double *masses) {
+  long double x = 0;
+  long double y = 0;
+  long double z = 0;
+
+  glm::dvec3 distance_vector;
+  double squared_distance;
+
+  for (size_t j = 0; j < num_bodies; ++j) {
+    // Check body_idx_want_force == j can be skiped as distance_vector will be
+    // zero in this case
+
+    // Precompute distance vector
+    distance_vector = positions[j] - positions[body_idx_want_force];
+    squared_distance = glm::length2(distance_vector) + constants::squared_softening_factor;
+    // x*sqrt(x) should be faster than pow(x, 3/2)
+    x += (masses[j] * distance_vector.x) / (squared_distance * sqrt(squared_distance));
+    y += (masses[j] * distance_vector.y) / (squared_distance * sqrt(squared_distance));
+    z += (masses[j] * distance_vector.z) / (squared_distance * sqrt(squared_distance));
+  }
+
+  x *= constants::gravitational_constant_in_au3_per_kg_d2;
+  y *= constants::gravitational_constant_in_au3_per_kg_d2;
+  z *= constants::gravitational_constant_in_au3_per_kg_d2;
+
+  glm::dvec3 force(x, y, z);
+
+  // multipling once at the end is faster and also better for precision
+  return force;
+}

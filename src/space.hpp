@@ -3,10 +3,11 @@
 #include <glm/ext/vector_double3.hpp>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace space {
 struct CelestialBody {
-public:
+ public:
   /// Unique of body. Might be helpful to avoid calculate force upon itself.
   int id;
   std::string name;
@@ -30,7 +31,7 @@ public:
 };
 
 struct DataRow {
-public:
+ public:
   /// Unitless
   double eccentricity;
   /// AU
@@ -62,11 +63,11 @@ public:
   // TODO
   std::string central_body;
 
-  CelestialBody
-  to_body(int id,
-          std::unordered_map<std::string, space::CelestialBody> const &bodies);
+  CelestialBody to_body(int id, std::unordered_map<std::string, space::CelestialBody> const &bodies);
 
   static DataRow parse_asteroid(const std::string &line);
   static DataRow parse_planet_moon(const std::string &line);
 };
-} // namespace space
+
+std::vector<space::CelestialBody> read_bodies(std::string path);
+}  // namespace space

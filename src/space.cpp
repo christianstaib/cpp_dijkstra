@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <fstream>
 #include <glm/fwd.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -267,6 +268,60 @@ CelestialBody DataRow::to_body(int id, std::unordered_map<std::string, space::Ce
   body.vel = vel;
 
   return body;
+}
+
+std::vector<space::CelestialBody> read_bodies(std::string path) {
+  // Set up data structures needed for reading the asteroids.
+  space::CelestialBody sun = space::CelestialBody::sun();
+
+  std::unordered_map<std::string, space::CelestialBody> name_to_body;
+  name_to_body.insert({"Sun", sun});
+
+  std::vector<std::pair<glm::dvec3, space::CelestialBody>> pos_to_body;
+  pos_to_body.push_back({sun.pos, sun});
+
+  std::vector<space::CelestialBody> bodies;
+  bodies.push_back(sun);
+
+  std::ifstream file(path);
+
+  if (file.is_open()) {
+    std::string line;
+    std::getline(file, line);  // skip header
+
+    while (std::getline(file, line)) {
+      space::DataRow row = space::DataRow::parse_asteroid(line);
+      space::CelestialBody body = row.to_body(name_to_body.size(), name_to_body);
+
+      if (!body.name.empty()) {
+        if (name_to_body.find(body.name) == name_to_body.end()) {
+          name_to_body.insert({body.name, body});
+        } else {
+          // printf(
+          //     "Error: A bdoy with the name %s is already known (distance "
+          //     "%f km)\n",
+          //     body.name.c_str(),
+          //     glm::distance(body.pos, name_to_body.at(body.name).pos) * constants::meters_per_astronomical_unit /
+          //         1000.0);
+        }
+      }
+
+      for (const auto &entry : pos_to_body) {
+        if (glm::distance(entry.second.pos, body.pos) <= 10000 * constants::astronomical_units_per_meter) {
+          printf(
+              "Error: A body at the position %f %f %f is already known (it "
+              "is called %s)\n",
+              body.pos.x, body.pos.y, body.pos.z, entry.second.name.c_str());
+        }
+      }
+      pos_to_body.push_back({body.pos, body});
+
+      bodies.push_back(body);
+    }
+    file.close();
+  }
+
+  return bodies;
 }
 
 }  // namespace space

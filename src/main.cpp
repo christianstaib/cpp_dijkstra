@@ -3,6 +3,7 @@
 #include <omp.h>
 
 #include <glm/ext/scalar_constants.hpp>
+#include <memory>
 #include <random>
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -24,95 +25,23 @@
 #include <unordered_map>
 #include <vector>
 
-#include "constants.hpp"
+#include "csv_writer.hpp"
 #include "naive_calculations.hpp"
 #include "octree.hpp"
 #include "space.hpp"
 
-std::vector<space::CelestialBody> read_bodies(std::string path) {
-  // Set up data structures needed for reading the asteroids.
-  space::CelestialBody sun = space::CelestialBody::sun();
-
-  std::unordered_map<std::string, space::CelestialBody> name_to_body;
-  name_to_body.insert({"Sun", sun});
-
-  std::vector<std::pair<glm::dvec3, space::CelestialBody>> pos_to_body;
-  pos_to_body.push_back({sun.pos, sun});
-
-  std::vector<space::CelestialBody> bodies;
-  bodies.push_back(sun);
-
-  std::ifstream file(path);
-
-  if (file.is_open()) {
-    std::string line;
-    std::getline(file, line);  // skip header
-
-    while (std::getline(file, line)) {
-      space::DataRow row = space::DataRow::parse_asteroid(line);
-      space::CelestialBody body = row.to_body(name_to_body.size(), name_to_body);
-
-      if (body.name == "Earth") {
-        printf("Earth %f %f %f\n", body.pos.x, body.pos.y, body.pos.z);
-      }
-
-      if (!body.name.empty()) {
-        if (name_to_body.find(body.name) == name_to_body.end()) {
-          name_to_body.insert({body.name, body});
-        } else {
-          printf(
-              "Error: A bdoy with the name %s is already known (distance "
-              "%f km)\n",
-              body.name.c_str(),
-              glm::distance(body.pos, name_to_body.at(body.name).pos) * constants::meters_per_astronomical_unit /
-                  1000.0);
-        }
-      }
-
-      for (const auto &entry : pos_to_body) {
-        if (glm::distance(entry.second.pos, body.pos) <= 10000 * constants::astronomical_units_per_meter) {
-          printf(
-              "Error: A body at the position %f %f %f is already known (it "
-              "is called %s)\n",
-              body.pos.x, body.pos.y, body.pos.z, entry.second.name.c_str());
-        }
-      }
-      pos_to_body.push_back({body.pos, body});
-
-      bodies.push_back(body);
-    }
-    file.close();
-  }
-
-  return bodies;
-}
-
-
-
-void write_data(std::ofstream &myfile, glm::dvec3 *positions, std::vector<space::CelestialBody> const &bodies) {
-  for (size_t i = 0; i < bodies.size(); ++i) {
-    myfile << "(" << bodies[i].name.c_str() << "," << bodies[i].type.c_str() << "," << positions[i].x << ","
-           << positions[i].y << ")";
-    if (i != bodies.size() - 1) {
-      myfile << ",";
-    } else {
-      myfile << "\n";
-    }
-  }
-}
-
 void loging(std::vector<space::CelestialBody> &bodies, size_t &num_bodies, double *masses, glm::dvec3 *positions,
             glm::dvec3 *velocities, int &vis_step_size, double &time_step, std::ofstream &myfile, int &iteration,
-            std::chrono::steady_clock::time_point *begin, indicators::ProgressBar &bar) {
+            std::chrono::steady_clock::time_point *begin, indicators::ProgressBar *bar) {
   if (iteration % vis_step_size == 0) {
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     double ms_per_it =
         ((double)std::chrono::duration_cast<std::chrono::microseconds>(end - *begin).count() / iteration) / 1000.0;
-    bar.set_option(indicators::option::PostfixText{std::to_string(ms_per_it) + "ms/it"});
+    bar->set_option(indicators::option::PostfixText{std::to_string(ms_per_it) + "ms/it"});
 
     double ke = naive_calculations::get_kinetic_energy(num_bodies, masses, velocities);
     double pe = naive_calculations::get_potential_energy(num_bodies, masses, positions);
-    write_data(myfile, positions, bodies);
+    csv_writer::write_data(myfile, positions, bodies);
   }
 }
 
@@ -129,7 +58,7 @@ void update_positions(size_t num_bodies, glm::dvec3 *velocities, glm::dvec3 *for
   glm::dvec3 local_min_edge = glm::dvec3(std::numeric_limits<double>::max());
   glm::dvec3 local_max_edge = glm::dvec3(std::numeric_limits<double>::min());
 
-#pragma omp for simd schedule(static)
+#pragma omp for simd schedule(guided)
   for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
     // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
     positions[body_idx] += velocities[body_idx] * time_step + 0.5 * forces[body_idx] * time_step * time_step;
@@ -148,49 +77,16 @@ void update_positions(size_t num_bodies, glm::dvec3 *velocities, glm::dvec3 *for
 }
 
 void rebuild_tree(size_t num_bodies, glm::dvec3 *positions, double *masses, glm::dvec3 *min_edge, glm::dvec3 *max_edge,
-                  octree::Octree &test) {
+                  octree::Octree &tree) {
   glm::dvec3 center = (*min_edge + *max_edge) * 0.5;
   glm::dvec3 diff = *max_edge - center;
   double size = std::max(std::max(diff.x, diff.y), diff.z);
 
-  test.clear(center, size);
+  tree.clear(center, size);
   for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
-    test.insert(positions[body_idx], masses[body_idx]);
+    tree.insert(positions[body_idx], masses[body_idx]);
   }
-  test.propagate();
-}
-
-/// Naive approach to get gravitional force on all bodies in (Kg*AU)/d^2.
-glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bodies, glm::dvec3 *positions,
-                                      double *masses) {
-  long double x = 0;
-  long double y = 0;
-  long double z = 0;
-
-  glm::dvec3 distance_vector;
-  double squared_distance;
-
-  for (size_t j = 0; j < num_bodies; ++j) {
-    // Check body_idx_want_force == j can be skiped as distance_vector will be
-    // zero in this case
-
-    // Precompute distance vector
-    distance_vector = positions[j] - positions[body_idx_want_force];
-    squared_distance = glm::length2(distance_vector) + constants::squared_softening_factor;
-    // x*sqrt(x) should be faster than pow(x, 3/2)
-    x += (masses[j] * distance_vector.x) / (squared_distance * sqrt(squared_distance));
-    y += (masses[j] * distance_vector.y) / (squared_distance * sqrt(squared_distance));
-    z += (masses[j] * distance_vector.z) / (squared_distance * sqrt(squared_distance));
-  }
-
-  x *= constants::gravitational_constant_in_au3_per_kg_d2;
-  y *= constants::gravitational_constant_in_au3_per_kg_d2;
-  z *= constants::gravitational_constant_in_au3_per_kg_d2;
-
-  glm::dvec3 force(x, y, z);
-
-  // multipling once at the end is faster and also better for precision
-  return force;
+  tree.propagate();
 }
 
 std::unique_ptr<CLI::App> setup_app(int *step_size_hours, int *vis_step_size_hours, int *t_end, double *theta,
@@ -210,6 +106,17 @@ std::unique_ptr<CLI::App> setup_app(int *step_size_hours, int *vis_step_size_hou
   CLI::Option *opt3 = app->add_option("--theta", *theta, "Barnes-Hut theta")->capture_default_str();
 
   return app;
+}
+
+std::unique_ptr<indicators::ProgressBar> setup_progressbar(size_t num_iterations) {
+  using namespace indicators;
+  show_console_cursor(true);
+
+  std::unique_ptr<indicators::ProgressBar> bar = std::make_unique<indicators::ProgressBar>(
+      option::BarWidth{50}, option::PrefixText{"Simulation"}, option::ShowElapsedTime{true},
+      option::ShowRemainingTime{true}, indicators::option::MaxProgress{num_iterations});
+
+  return bar;
 }
 
 int main(int argc, char **argv) {
@@ -233,25 +140,20 @@ int main(int argc, char **argv) {
 
   double squared_theta = theta * theta;
   double step_size_days = 1.0 / (24 * step_size_hours);
-  int num_iterations = int((t_end * 365) / step_size_days);
+  size_t num_iterations = int((t_end * 365) / step_size_days);
 
   // Hide cursor
-  using namespace indicators;
-  show_console_cursor(true);
-
-  indicators::ProgressBar bar{option::BarWidth{50}, option::PrefixText{"Simulation"}, option::ShowElapsedTime{true},
-                              option::ShowRemainingTime{true}, indicators::option::MaxProgress{num_iterations}};
+  std::unique_ptr<indicators::ProgressBar> bar = setup_progressbar(num_iterations);
 
   //
 
-  std::vector<space::CelestialBody> bodies = read_bodies(bodies_file);
+  std::vector<space::CelestialBody> bodies = space::read_bodies(bodies_file);
   // shfule to break order for better tree inserting performance
   auto rng = std::default_random_engine{};
   std::shuffle(std::begin(bodies), std::end(bodies), rng);
-  size_t num_bodies = bodies.size();
-  printf("there are %zu bodies\n", num_bodies);
 
   // setup
+  size_t num_bodies = bodies.size();
   double *masses = new double[num_bodies];
   glm::dvec3 *position = new glm::dvec3[num_bodies];
   glm::dvec3 *velocity = new glm::dvec3[num_bodies];
@@ -268,54 +170,29 @@ int main(int argc, char **argv) {
     max_edge = max(max_edge, position[body_idx]);
   }
 
+  octree::Octree test(glm::dvec3(0.0), 0.0);
+  rebuild_tree(num_bodies, position, masses, &min_edge, &max_edge, test);
+
   std::ofstream myfile;
   myfile.open("data/data.txt");
 
-  octree::Octree test(glm::dvec3(0.0), 0.0);
-  rebuild_tree(num_bodies, position, masses, &min_edge, &max_edge, test);
 #pragma omp parallel for schedule(static)
   for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
     old_force[body_idx] = test.get_force(position[body_idx], theta);
   }
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-  int n = 1000;
-  for (int i = 0; i < n; ++i) {
-    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-    octree::VecTreeNode root = octree::VecTreeNode::create_root(num_bodies, position, masses, test.nodes[0].cube);
-    root.split_all();
-    if (i == 0) {
-      printf("root size is %f\n", test.nodes[0].cube.half_edge_length);
-    }
-    root.free_children();
-  }
-  // printf("root size is %f\n", root.cube.half_edge_length);
-  // root.split();
-
-  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-  double ms_per_it = ((double)std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()) / 1000.0;
-  printf("building tree took %f ms\n", ms_per_it / n);
-
-  std::vector<double> build_tree_time;
-
-  begin = std::chrono::steady_clock::now();
   for (int iteration = 0; iteration < num_iterations; ++iteration) {
-    bar.tick();
+    bar->tick();
     loging(bodies, num_bodies, masses, position, velocity, vis_step_size_hours, step_size_days, myfile, iteration,
-           &begin, bar);
+           &begin, bar.get());
 
 #pragma omp parallel
     {
       update_positions(num_bodies, velocity, old_force, position, step_size_days, &min_edge, &max_edge);
 
 #pragma omp single
-      {
-        std::chrono::steady_clock::time_point begin1 = std::chrono::steady_clock::now();
-        rebuild_tree(num_bodies, position, masses, &min_edge, &max_edge, test);
-        std::chrono::steady_clock::time_point end1 = std::chrono::steady_clock::now();
-        double xxx = ((double)std::chrono::duration_cast<std::chrono::microseconds>(end1 - begin1).count()) / 1000.0;
-        build_tree_time.push_back(xxx);
-      }
+      rebuild_tree(num_bodies, position, masses, &min_edge, &max_edge, test);
 
       // get_force performs a tree traversal with variable execution times,
       // therfore use schedule(guided) workload balancing
@@ -328,9 +205,6 @@ int main(int argc, char **argv) {
       }
     }
   }
-
-  double sum = accumulate(build_tree_time.begin(), build_tree_time.end(), 0.0);
-  printf("build tree time is %f ms\n", sum / build_tree_time.size());
 
   myfile.close();
 
