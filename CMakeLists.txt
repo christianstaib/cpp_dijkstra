@@ -11,5 +11,9 @@ find_package(indicators REQUIRED)
 include_directories(SYSTEM ${MPI_C_INCLUDE_PATH})
 add_executable(${PROJECT_NAME} src/main.cpp src/space.cpp src/octree.cpp)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+
+
 target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_CXX glm::glm CLI11::CLI11 indicators::indicators)
 

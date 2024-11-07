@@ -40,17 +40,6 @@ class Node {
   bool is_empty();
 };
 
-struct VecTreeNode {
-  Cube cube;
-  std::vector<std::pair<glm::dvec3, double>> data;
-  std::array<VecTreeNode, 8> *children;
-
-  void split_all();
-  std::vector<VecTreeNode *> split();
-  int count();
-  static VecTreeNode create_root(size_t num_bodies, glm::dvec3 *positions, double *masses, Cube cube);
-};
-
 class Octree {
  public:
   std::vector<Node> nodes;
@@ -62,6 +51,19 @@ class Octree {
   glm::dvec3 get_force(glm::dvec3 pos, double theta);
   void insert(glm::dvec3 pos, double mass);
   int subdivide(int node);
+};
+
+struct VecTreeNode {
+  Cube cube;
+  std::vector<std::pair<glm::dvec3, double>> data;
+  std::array<VecTreeNode, 8> *children;
+
+  Octree to_octree();
+  void split_all();
+  void free_children();
+  std::vector<VecTreeNode *> split();
+  int count();
+  static VecTreeNode create_root(size_t num_bodies, glm::dvec3 *positions, double *masses, Cube cube);
 };
 
 }  // namespace octree

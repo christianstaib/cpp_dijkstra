@@ -159,18 +159,51 @@ int VecTreeNode::count() {
 
 void VecTreeNode::split_all() {
   std::vector<VecTreeNode *> to_split;
+  std::vector<VecTreeNode *> to_split_less_n;
+  size_t old_size = to_split.size();
+
+  size_t n = 1;
+
   to_split.push_back(this);
 
-  while (!to_split.empty()) {
-    VecTreeNode *this_split = to_split.back();
-    to_split.pop_back();
+  while (old_size != to_split.size()) {
+    size_t to_split_size = to_split.size();
+#pragma omp parallel
+    {
+      std::vector<VecTreeNode *> local_to_split;
 
-    std::vector<VecTreeNode *> y = this_split->split();
-    for (auto x : y) {
-      to_split.push_back(x);
+#pragma omp for schedule(guided)
+      for (size_t i = old_size; i < to_split_size; ++i) {
+        VecTreeNode *this_split = to_split[i];
+
+        std::vector<VecTreeNode *> y = this_split->split();
+        for (auto x : y) {
+          // if (x->data.size() >= n) {
+          local_to_split.push_back(x);
+          // }
+        }
+      }
+
+      if (!local_to_split.empty()) {
+#pragma omp critical
+        to_split.insert(to_split.end(), local_to_split.begin(), local_to_split.end());
+      }
     }
+
+    old_size = to_split_size;
   }
 }
+
+void VecTreeNode::free_children() {
+  if (children != nullptr) {
+    for (auto x : *children) {
+      x.free_children();
+    }
+    free(children);
+  }
+}
+
+Octree VecTreeNode::to_octree() {}
 
 std::vector<VecTreeNode *> VecTreeNode::split() {
   children = new std::array<VecTreeNode, 8>();
@@ -193,7 +226,7 @@ std::vector<VecTreeNode *> VecTreeNode::split() {
   }
 
   // maybe not necesarry?
-  data.clear();
+  // data.clear();
 
   return need_to_be_split;
 }

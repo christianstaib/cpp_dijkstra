@@ -1,6 +1,4 @@
 [requires]
-nlohmann_json/3.11.3
-zpp_bits/4.4.20
 glm/1.0.1
 cli11/2.4.2
 indicators/2.3
