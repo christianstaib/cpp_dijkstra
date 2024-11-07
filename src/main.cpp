@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "constants.hpp"
+#include "naive_calculations.hpp"
 #include "octree.hpp"
 #include "space.hpp"
 
@@ -86,54 +87,7 @@ std::vector<space::CelestialBody> read_bodies(std::string path) {
   return bodies;
 }
 
-void update_forces_naive(double *masses, glm::dvec3 *positions, glm::dvec3 *velocities, glm::dvec3 *forces,
-                         size_t num_bodies) {
-#pragma omp parallel for schedule(static)
-  for (size_t i = 0; i < num_bodies; ++i) {
-    glm::dvec3 distance_vector;
-    double squared_distance;
-    for (size_t j = 0; j < num_bodies; ++j) {
-      if (i == j) {
-        continue;
-      }
 
-      // Precompute distance vector
-      distance_vector = positions[j] - positions[i];
-      squared_distance = glm::length2(distance_vector) + constants::squared_softening_factor;
-      // x*sqrt(x) should be faster than pow(x, 3/2)
-      forces[i] += (masses[j] * distance_vector) / (squared_distance * sqrt(squared_distance));
-    }
-
-    forces[i] *= constants::gravitational_constant_in_au3_per_kg_d2;
-  }
-}
-
-double get_kinetic_energy(size_t num_bodies, double *masses, glm::dvec3 *velocities) {
-  double kinetic_energy = 0.0;
-
-  for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
-    kinetic_energy += 0.5 * masses[body_idx] * glm::length2(velocities[body_idx]);
-  }
-
-  return kinetic_energy;
-}
-
-double get_potential_energy(size_t num_bodies, double *masses, glm::dvec3 *positions) {
-  double potential_energy = 0.0;
-
-  for (size_t i = 0; i < num_bodies; ++i) {
-    for (size_t j = 0; j < i; ++j) {
-      glm::dvec3 diff = positions[j] - positions[i];
-      double distance = glm::length(diff) + constants::softening_factor;
-
-      double new_val = (constants::gravitational_constant_in_au3_per_kg_d2 * masses[i] * masses[j]) / distance;
-
-      potential_energy -= new_val;
-    }
-  }
-
-  return potential_energy;
-}
 
 void write_data(std::ofstream &myfile, glm::dvec3 *positions, std::vector<space::CelestialBody> const &bodies) {
   for (size_t i = 0; i < bodies.size(); ++i) {
@@ -156,8 +110,8 @@ void loging(std::vector<space::CelestialBody> &bodies, size_t &num_bodies, doubl
         ((double)std::chrono::duration_cast<std::chrono::microseconds>(end - *begin).count() / iteration) / 1000.0;
     bar.set_option(indicators::option::PostfixText{std::to_string(ms_per_it) + "ms/it"});
 
-    double ke = get_kinetic_energy(num_bodies, masses, velocities);
-    double pe = get_potential_energy(num_bodies, masses, positions);
+    double ke = naive_calculations::get_kinetic_energy(num_bodies, masses, velocities);
+    double pe = naive_calculations::get_potential_energy(num_bodies, masses, positions);
     write_data(myfile, positions, bodies);
   }
 }
@@ -217,7 +171,8 @@ glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bod
   double squared_distance;
 
   for (size_t j = 0; j < num_bodies; ++j) {
-    // Check body_idx_want_force == j can be skiped as distance_vector will be zero in this case
+    // Check body_idx_want_force == j can be skiped as distance_vector will be
+    // zero in this case
 
     // Precompute distance vector
     distance_vector = positions[j] - positions[body_idx_want_force];
@@ -238,20 +193,34 @@ glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bod
   return force;
 }
 
-int parse_cli(int argc, char **argv, int *step_size_hours, int *vis_step_size_hours, int *t_end, double *theta) {
-  // ./simulate --file scenario1.csv --dt 1h --t_end 12y --vs 2d --vs_dir sim_s1 --theta 1.05
-  CLI::App app("Gravity Simulator");
-  // add version output
-  app.set_version_flag("--version", std::string(CLI11_VERSION));
-  std::string bodies_file;
-  CLI::Option *opt0 = app.add_option("--file", bodies_file, "File name");
+std::unique_ptr<CLI::App> setup_app(int *step_size_hours, int *vis_step_size_hours, int *t_end, double *theta,
+                                    std::string *bodies_file) {
+  std::unique_ptr<CLI::App> app = std::make_unique<CLI::App>("Gravity Simulator");
+
+  app->set_version_flag("--version", std::string(CLI11_VERSION));
+
+  CLI::Option *opt0 = app->add_option("--file", *bodies_file, "File name");
   opt0->required();
 
-  CLI::Option *opt1 = app.add_option("--dt", *step_size_hours, "Step size in hours");
-  CLI::Option *opt4 = app.add_option("--vs", *step_size_hours, "Visualization step size in hours");
-  CLI::Option *opt2 = app.add_option("--t_end", *t_end, "Length of simulation in years");
-  CLI::Option *opt3 = app.add_option("--theta", *theta, "Barnes-Hut theta");
-  CLI11_PARSE(app, argc, argv);
+  CLI::Option *opt1 = app->add_option("--dt", *step_size_hours, "Step size in hours")->capture_default_str();
+  CLI::Option *opt4 =
+      app->add_option("--vs", *vis_step_size_hours, "Visualization step size in hours")->capture_default_str();
+
+  CLI::Option *opt2 = app->add_option("--t_end", *t_end, "Length of simulation in years")->capture_default_str();
+  CLI::Option *opt3 = app->add_option("--theta", *theta, "Barnes-Hut theta")->capture_default_str();
+
+  return app;
+}
+
+int main(int argc, char **argv) {
+  int step_size_hours{1};
+  int vis_step_size_hours{24};
+  int t_end{1};
+  double theta{1.0};
+  std::string bodies_file;
+
+  auto app = setup_app(&step_size_hours, &vis_step_size_hours, &t_end, &theta, &bodies_file);
+  CLI11_PARSE(*app, argc, argv);
 
   std::cout << "Working on file: " << bodies_file << "\n";
   std::cout << "Step size in hours: " << step_size_hours << "\n";
@@ -260,23 +229,10 @@ int parse_cli(int argc, char **argv, int *step_size_hours, int *vis_step_size_ho
   std::cout << "Barnes-Hut theta: " << theta << "\n";
   std::cout << "\n";
 
-  return 0;
-}
-
-int main(int argc, char **argv) {
-  int step_size_hours{1};
-  int vis_step_size_hours{24};
-  int t_end{1};
-  double theta{1.0};
-
-  parse_cli(argc, argv, &step_size_hours, &vis_step_size_hours, &t_end, &theta);
-
   //
 
   double squared_theta = theta * theta;
-
   double step_size_days = 1.0 / (24 * step_size_hours);
-
   int num_iterations = int((t_end * 365) / step_size_days);
 
   // Hide cursor
@@ -288,7 +244,7 @@ int main(int argc, char **argv) {
 
   //
 
-  std::vector<space::CelestialBody> bodies = read_bodies("data/combined.csv");
+  std::vector<space::CelestialBody> bodies = read_bodies(bodies_file);
   // shfule to break order for better tree inserting performance
   auto rng = std::default_random_engine{};
   std::shuffle(std::begin(bodies), std::end(bodies), rng);
