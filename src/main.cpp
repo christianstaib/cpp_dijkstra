@@ -238,7 +238,7 @@ glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bod
   return force;
 }
 
-int main(int argc, char **argv) {
+int parse_cli(int argc, char **argv, int *step_size_hours, int *vis_step_size_hours, int *t_end, double *theta) {
   // ./simulate --file scenario1.csv --dt 1h --t_end 12y --vs 2d --vs_dir sim_s1 --theta 1.05
   CLI::App app("Gravity Simulator");
   // add version output
@@ -247,18 +247,10 @@ int main(int argc, char **argv) {
   CLI::Option *opt0 = app.add_option("--file", bodies_file, "File name");
   opt0->required();
 
-  int step_size_hours{1};
-  CLI::Option *opt1 = app.add_option("--dt", step_size_hours, "Step size in hours");
-
-  int vis_step_size_hours{24};
-  CLI::Option *opt4 = app.add_option("--vs", step_size_hours, "Visualization step size in hours");
-
-  int t_end{1};
-  CLI::Option *opt2 = app.add_option("--t_end", t_end, "Length of simulation in years");
-
-  double theta{1.0};
-  CLI::Option *opt3 = app.add_option("--theta", theta, "Barnes-Hut theta");
-
+  CLI::Option *opt1 = app.add_option("--dt", *step_size_hours, "Step size in hours");
+  CLI::Option *opt4 = app.add_option("--vs", *step_size_hours, "Visualization step size in hours");
+  CLI::Option *opt2 = app.add_option("--t_end", *t_end, "Length of simulation in years");
+  CLI::Option *opt3 = app.add_option("--theta", *theta, "Barnes-Hut theta");
   CLI11_PARSE(app, argc, argv);
 
   std::cout << "Working on file: " << bodies_file << "\n";
@@ -267,6 +259,17 @@ int main(int argc, char **argv) {
   std::cout << "Length of simulation in year: " << t_end << "\n";
   std::cout << "Barnes-Hut theta: " << theta << "\n";
   std::cout << "\n";
+
+  return 0;
+}
+
+int main(int argc, char **argv) {
+  int step_size_hours{1};
+  int vis_step_size_hours{24};
+  int t_end{1};
+  double theta{1.0};
+
+  parse_cli(argc, argv, &step_size_hours, &vis_step_size_hours, &t_end, &theta);
 
   //
 
