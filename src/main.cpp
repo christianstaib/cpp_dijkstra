@@ -81,14 +81,21 @@ void update_positions(space::BodySystem &body_system, double time_step) {
   }
 }
 
-void update_velocities(space::BodySystem &body_system, octree::Octree &tree, double squared_theta,
-                       double step_size_days) {
+void update_acceleration(space::BodySystem &body_system, octree::Octree &tree, double squared_theta,
+                         double step_size_days) {
 #pragma omp parallel for simd schedule(guided)
   for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
-    glm::dvec3 new_force = tree.get_force(body_system.position[body_idx], squared_theta);
-    // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
-    body_system.velocity[body_idx] += 0.5 * (body_system.acceleration[body_idx] + new_force) * step_size_days;
-    body_system.acceleration[body_idx] = new_force;
+    body_system.acceleration[body_idx] = tree.get_force(body_system.position[body_idx], squared_theta);
+  }
+}
+
+void update_velocity(space::BodySystem &body_system, octree::Octree &tree, double squared_theta,
+                     double step_size_days) {
+  // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
+#pragma omp parallel for simd
+  for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
+    body_system.velocity[body_idx] +=
+        0.5 * (body_system.old_acceleration[body_idx] + body_system.acceleration[body_idx]) * step_size_days;
   }
 }
 
@@ -104,11 +111,11 @@ void rebuild_tree(space::BodySystem &body_system, octree::Octree &tree) {
   tree.propagate();
 }
 
-void init_force(space::BodySystem &body_system, octree::Octree &tree, double squared_theta) {
+void init_acceleration(space::BodySystem &body_system, octree::Octree &tree, double squared_theta) {
   rebuild_tree(body_system, tree);
 #pragma omp parallel for schedule(static)
   for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
-    body_system.acceleration[body_idx] = tree.get_force(body_system.position[body_idx], squared_theta);
+    body_system.old_acceleration[body_idx] = tree.get_force(body_system.position[body_idx], squared_theta);
   }
 }
 
@@ -152,7 +159,7 @@ int main(int argc, char **argv) {
   myfile.open("data/data.txt");
 
   octree::Octree tree(glm::dvec3(0.0), 0.0);
-  init_force(body_system, tree, squared_theta);
+  init_acceleration(body_system, tree, squared_theta);
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   for (int iteration = 0; iteration < num_iterations; ++iteration) {
@@ -161,14 +168,14 @@ int main(int argc, char **argv) {
 
     update_positions(body_system, step_size_days);
 
-    // TODO MPI positions to all
-
     // No need to send the tree, tree can be build on each node
     rebuild_tree(body_system, tree);
 
-    update_velocities(body_system, tree, squared_theta, step_size_days);
+    update_acceleration(body_system, tree, squared_theta, step_size_days);
 
-    // TODO MPI velocities to all
+    update_velocity(body_system, tree, squared_theta, step_size_days);
+
+    std::swap(body_system.acceleration, body_system.old_acceleration);
   }
 
   myfile.close();
