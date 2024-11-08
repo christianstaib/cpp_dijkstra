@@ -48,7 +48,7 @@ class Octree {
   Octree(glm::dvec3 center, double size);
   void clear(glm::dvec3 center, double size);
   void propagate();
-  glm::dvec3 get_force(glm::dvec3 pos, double theta);
+  glm::dvec3 get_force(glm::dvec3 pos, double squared_theta);
   void insert(glm::dvec3 pos, double mass);
   int subdivide(int node);
 };

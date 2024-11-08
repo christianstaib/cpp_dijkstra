@@ -70,4 +70,23 @@ struct DataRow {
 };
 
 std::vector<space::CelestialBody> read_bodies(std::string path);
+
+// Define a struct for body system data
+struct BodySystem {
+  size_t num_bodies;
+  double *mass;
+  glm::dvec3 *position;
+  glm::dvec3 *velocity;
+  glm::dvec3 *old_acceleration;
+  glm::dvec3 *acceleration;
+  glm::dvec3 min_edge;
+  glm::dvec3 max_edge;
+
+  // Constructor to initialize the system from a vector of bodies
+  BodySystem(const std::vector<CelestialBody> &bodies);
+
+  // Destructor to clean up dynamically allocated memory
+  ~BodySystem();
+};
+
 }  // namespace space

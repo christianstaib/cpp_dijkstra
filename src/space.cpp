@@ -324,4 +324,33 @@ std::vector<space::CelestialBody> read_bodies(std::string path) {
   return bodies;
 }
 
+// Constructor implementation
+BodySystem::BodySystem(const std::vector<CelestialBody> &bodies)
+    : num_bodies(bodies.size()),
+      mass(new double[num_bodies]),
+      position(new glm::dvec3[num_bodies]),
+      velocity(new glm::dvec3[num_bodies]),
+      old_acceleration(new glm::dvec3[num_bodies]),
+      acceleration(new glm::dvec3[num_bodies]),
+      min_edge(std::numeric_limits<double>::max()),
+      max_edge(std::numeric_limits<double>::min()) {
+  for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
+    mass[body_idx] = bodies[body_idx].mass;
+    position[body_idx] = bodies[body_idx].pos;
+    velocity[body_idx] = bodies[body_idx].vel;
+
+    min_edge = glm::min(min_edge, position[body_idx]);
+    max_edge = glm::max(max_edge, position[body_idx]);
+  }
+}
+
+// Destructor implementation
+BodySystem::~BodySystem() {
+  delete[] mass;
+  delete[] position;
+  delete[] velocity;
+  delete[] old_acceleration;
+  delete[] acceleration;
+}
+
 }  // namespace space

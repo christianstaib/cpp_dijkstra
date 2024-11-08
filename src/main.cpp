@@ -6,6 +6,8 @@
 #include <memory>
 #include <random>
 
+#include "cli.hpp"
+
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include <CLI/CLI.hpp>
@@ -30,93 +32,84 @@
 #include "octree.hpp"
 #include "space.hpp"
 
-void loging(std::vector<space::CelestialBody> &bodies, size_t &num_bodies, double *masses, glm::dvec3 *positions,
-            glm::dvec3 *velocities, int &vis_step_size, double &time_step, std::ofstream &myfile, int &iteration,
-            std::chrono::steady_clock::time_point *begin, indicators::ProgressBar *bar) {
+void loging(std::vector<space::CelestialBody> &bodies, space::BodySystem &body_system, int &vis_step_size,
+            double &time_step, std::ofstream &myfile, int &iteration, std::chrono::steady_clock::time_point *begin,
+            indicators::ProgressBar *bar) {
   if (iteration % vis_step_size == 0) {
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     double ms_per_it =
         ((double)std::chrono::duration_cast<std::chrono::microseconds>(end - *begin).count() / iteration) / 1000.0;
     bar->set_option(indicators::option::PostfixText{std::to_string(ms_per_it) + "ms/it"});
 
-    double ke = naive_calculations::get_kinetic_energy(num_bodies, masses, velocities);
-    double pe = naive_calculations::get_potential_energy(num_bodies, masses, positions);
-    csv_writer::write_data(myfile, positions, bodies);
+    double ke = naive_calculations::get_kinetic_energy(body_system.num_bodies, body_system.mass, body_system.velocity);
+    double pe =
+        naive_calculations::get_potential_energy(body_system.num_bodies, body_system.mass, body_system.position);
+    csv_writer::write_data(myfile, body_system.position, bodies);
   }
 }
 
 // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
 // Needs to be run in a parallel section
-void update_positions(size_t num_bodies, glm::dvec3 *velocities, glm::dvec3 *forces, glm::dvec3 *positions,
-                      double time_step, glm::dvec3 *min_edge, glm::dvec3 *max_edge) {
-#pragma omp critical
+void update_positions(space::BodySystem &body_system, double time_step) {
+#pragma omp parallel
   {
-    *min_edge = glm::dvec3(std::numeric_limits<double>::max());
-    *max_edge = glm::dvec3(std::numeric_limits<double>::min());
-  }
+#pragma omp critical
+    {
+      body_system.min_edge = glm::dvec3(std::numeric_limits<double>::max());
+      body_system.max_edge = glm::dvec3(std::numeric_limits<double>::min());
+    }
 
-  glm::dvec3 local_min_edge = glm::dvec3(std::numeric_limits<double>::max());
-  glm::dvec3 local_max_edge = glm::dvec3(std::numeric_limits<double>::min());
+    glm::dvec3 local_min_edge = glm::dvec3(std::numeric_limits<double>::max());
+    glm::dvec3 local_max_edge = glm::dvec3(std::numeric_limits<double>::min());
 
 #pragma omp for simd schedule(guided)
-  for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
-    // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
-    positions[body_idx] += velocities[body_idx] * time_step + 0.5 * forces[body_idx] * time_step * time_step;
+    for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
+      // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
+      body_system.position[body_idx] +=
+          body_system.velocity[body_idx] * time_step + 0.5 * body_system.acceleration[body_idx] * time_step * time_step;
 
-    local_min_edge = min(local_min_edge, positions[body_idx]);
-    local_max_edge = max(local_max_edge, positions[body_idx]);
-  }
+      local_min_edge = min(local_min_edge, body_system.position[body_idx]);
+      local_max_edge = max(local_max_edge, body_system.position[body_idx]);
+    }
 
-  // better use custom reduction?
+    // better use custom reduction?
 #pragma omp critical
-  {
-    *min_edge = min(*min_edge, local_min_edge);
-    *max_edge = max(*max_edge, local_max_edge);
+    {
+      body_system.min_edge = min(body_system.min_edge, local_min_edge);
+      body_system.max_edge = max(body_system.max_edge, local_max_edge);
+    }
   }
-#pragma omp barrier
 }
 
-void rebuild_tree(size_t num_bodies, glm::dvec3 *positions, double *masses, glm::dvec3 *min_edge, glm::dvec3 *max_edge,
-                  octree::Octree &tree) {
-  glm::dvec3 center = (*min_edge + *max_edge) * 0.5;
-  glm::dvec3 diff = *max_edge - center;
+void update_velocities(space::BodySystem &body_system, octree::Octree &tree, double squared_theta,
+                       double step_size_days) {
+#pragma omp parallel for simd schedule(guided)
+  for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
+    glm::dvec3 new_force = tree.get_force(body_system.position[body_idx], squared_theta);
+    // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
+    body_system.velocity[body_idx] += 0.5 * (body_system.acceleration[body_idx] + new_force) * step_size_days;
+    body_system.acceleration[body_idx] = new_force;
+  }
+}
+
+void rebuild_tree(space::BodySystem &body_system, octree::Octree &tree) {
+  glm::dvec3 center = (body_system.min_edge + body_system.max_edge) * 0.5;
+  glm::dvec3 diff = body_system.max_edge - center;
   double size = std::max(std::max(diff.x, diff.y), diff.z);
 
   tree.clear(center, size);
-  for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
-    tree.insert(positions[body_idx], masses[body_idx]);
+  for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
+    tree.insert(body_system.position[body_idx], body_system.mass[body_idx]);
   }
   tree.propagate();
 }
 
-std::unique_ptr<CLI::App> setup_app(int *step_size_hours, int *vis_step_size_hours, int *t_end, double *theta,
-                                    std::string *bodies_file) {
-  std::unique_ptr<CLI::App> app = std::make_unique<CLI::App>("Gravity Simulator");
-
-  app->set_version_flag("--version", std::string(CLI11_VERSION));
-
-  CLI::Option *opt0 = app->add_option("--file", *bodies_file, "File name");
-  opt0->required();
-
-  CLI::Option *opt1 = app->add_option("--dt", *step_size_hours, "Step size in hours")->capture_default_str();
-  CLI::Option *opt4 =
-      app->add_option("--vs", *vis_step_size_hours, "Visualization step size in hours")->capture_default_str();
-
-  CLI::Option *opt2 = app->add_option("--t_end", *t_end, "Length of simulation in years")->capture_default_str();
-  CLI::Option *opt3 = app->add_option("--theta", *theta, "Barnes-Hut theta")->capture_default_str();
-
-  return app;
-}
-
-std::unique_ptr<indicators::ProgressBar> setup_progressbar(size_t num_iterations) {
-  using namespace indicators;
-  show_console_cursor(true);
-
-  std::unique_ptr<indicators::ProgressBar> bar = std::make_unique<indicators::ProgressBar>(
-      option::BarWidth{50}, option::PrefixText{"Simulation"}, option::ShowElapsedTime{true},
-      option::ShowRemainingTime{true}, indicators::option::MaxProgress{num_iterations});
-
-  return bar;
+void init_force(space::BodySystem &body_system, octree::Octree &tree, double squared_theta) {
+  rebuild_tree(body_system, tree);
+#pragma omp parallel for schedule(static)
+  for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
+    body_system.acceleration[body_idx] = tree.get_force(body_system.position[body_idx], squared_theta);
+  }
 }
 
 int main(int argc, char **argv) {
@@ -126,7 +119,7 @@ int main(int argc, char **argv) {
   double theta{1.0};
   std::string bodies_file;
 
-  auto app = setup_app(&step_size_hours, &vis_step_size_hours, &t_end, &theta, &bodies_file);
+  auto app = cli::setup_app(&step_size_hours, &vis_step_size_hours, &t_end, &theta, &bodies_file);
   CLI11_PARSE(*app, argc, argv);
 
   std::cout << "Working on file: " << bodies_file << "\n";
@@ -143,7 +136,7 @@ int main(int argc, char **argv) {
   size_t num_iterations = int((t_end * 365) / step_size_days);
 
   // Hide cursor
-  std::unique_ptr<indicators::ProgressBar> bar = setup_progressbar(num_iterations);
+  std::unique_ptr<indicators::ProgressBar> bar = cli::setup_progressbar(num_iterations);
 
   //
 
@@ -153,65 +146,32 @@ int main(int argc, char **argv) {
   std::shuffle(std::begin(bodies), std::end(bodies), rng);
 
   // setup
-  size_t num_bodies = bodies.size();
-  double *masses = new double[num_bodies];
-  glm::dvec3 *position = new glm::dvec3[num_bodies];
-  glm::dvec3 *velocity = new glm::dvec3[num_bodies];
-  glm::dvec3 *old_force = new glm::dvec3[num_bodies];
-
-  glm::dvec3 min_edge(std::numeric_limits<double>::max());
-  glm::dvec3 max_edge(std::numeric_limits<double>::min());
-
-  for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
-    masses[body_idx] = bodies[body_idx].mass;
-    position[body_idx] = bodies[body_idx].pos;
-    velocity[body_idx] = bodies[body_idx].vel;
-    min_edge = min(min_edge, position[body_idx]);
-    max_edge = max(max_edge, position[body_idx]);
-  }
-
-  octree::Octree test(glm::dvec3(0.0), 0.0);
-  rebuild_tree(num_bodies, position, masses, &min_edge, &max_edge, test);
+  space::BodySystem body_system(bodies);
 
   std::ofstream myfile;
   myfile.open("data/data.txt");
 
-#pragma omp parallel for schedule(static)
-  for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
-    old_force[body_idx] = test.get_force(position[body_idx], theta);
-  }
+  octree::Octree tree(glm::dvec3(0.0), 0.0);
+  init_force(body_system, tree, squared_theta);
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   for (int iteration = 0; iteration < num_iterations; ++iteration) {
     bar->tick();
-    loging(bodies, num_bodies, masses, position, velocity, vis_step_size_hours, step_size_days, myfile, iteration,
-           &begin, bar.get());
+    loging(bodies, body_system, vis_step_size_hours, step_size_days, myfile, iteration, &begin, bar.get());
 
-#pragma omp parallel
-    {
-      update_positions(num_bodies, velocity, old_force, position, step_size_days, &min_edge, &max_edge);
+    update_positions(body_system, step_size_days);
 
-#pragma omp single
-      rebuild_tree(num_bodies, position, masses, &min_edge, &max_edge, test);
+    // TODO MPI positions to all
 
-      // get_force performs a tree traversal with variable execution times,
-      // therfore use schedule(guided) workload balancing
-#pragma omp for simd schedule(guided)
-      for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
-        glm::dvec3 new_force = test.get_force(position[body_idx], squared_theta);
-        // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
-        velocity[body_idx] += 0.5 * (old_force[body_idx] + new_force) * step_size_days;
-        old_force[body_idx] = new_force;
-      }
-    }
+    // No need to send the tree, tree can be build on each node
+    rebuild_tree(body_system, tree);
+
+    update_velocities(body_system, tree, squared_theta, step_size_days);
+
+    // TODO MPI velocities to all
   }
 
   myfile.close();
-
-  free(masses);
-  free(position);
-  free(velocity);
-  free(old_force);
 
   return 0;
 }
