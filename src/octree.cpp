@@ -67,8 +67,8 @@ Cube Cube::create_subcube(int quadrant) {
   return subcube;
 }
 
-Octree::Octree(glm::dvec3 center, double size) {
-  Cube root{center, size};
+Octree::Octree() {
+  Cube root{glm::dvec3(0), 0.0};
   nodes.push_back(Node(root, 0));
 };
 
@@ -257,7 +257,7 @@ void Octree::propagate() {
   }
 }
 
-glm::dvec3 Octree::get_force(glm::dvec3 pos, double squared_theta) {
+glm::dvec3 Octree::get_acceleration(glm::dvec3 pos, double squared_theta) {
   glm::dvec3 force(0.0), subforce(0.0);
   int node_idx = 0;
   double squared_length_subforce, magnitude;

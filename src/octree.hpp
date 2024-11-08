@@ -45,10 +45,10 @@ class Octree {
   std::vector<Node> nodes;
   std::vector<int> parents;  // parent of node[i] is nodes[parents[(i - 1)/8]]
 
-  Octree(glm::dvec3 center, double size);
+  Octree();
   void clear(glm::dvec3 center, double size);
   void propagate();
-  glm::dvec3 get_force(glm::dvec3 pos, double squared_theta);
+  glm::dvec3 get_acceleration(glm::dvec3 pos, double squared_theta);
   void insert(glm::dvec3 pos, double mass);
   int subdivide(int node);
 };
