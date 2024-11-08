@@ -89,7 +89,7 @@ void update_acceleration(space::BodySystem &body_system, octree::Octree &tree, d
 }
 
 // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
-void update_velocity(space::BodySystem &body_system, octree::Octree &tree, double step_size_days) {
+void update_velocity(space::BodySystem &body_system, double step_size_days) {
 #pragma omp parallel for simd
   for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
     body_system.velocity[body_idx] +=
@@ -156,8 +156,10 @@ int main(int argc, char **argv) {
   std::ofstream myfile;
   myfile.open("data/data.txt");
 
-  octree::Octree tree;
-  init_acceleration(body_system, tree, squared_theta);
+  // octree::Octree tree;
+  // init_acceleration(body_system, tree, squared_theta);
+  naive_calculations::update_acceleration(body_system);
+  std::swap(body_system.acceleration, body_system.old_acceleration);
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   for (int iteration = 0; iteration < num_iterations; ++iteration) {
@@ -166,11 +168,12 @@ int main(int argc, char **argv) {
 
     update_positions(body_system, step_size_days);
 
-    // No need to send the tree, tree can be build on each node
-    rebuild_tree(body_system, tree);
-    update_acceleration(body_system, tree, squared_theta);
+    // // No need to send the tree, tree can be build on each node
+    // rebuild_tree(body_system, tree);
+    // update_acceleration(body_system, tree, squared_theta);
+    naive_calculations::update_acceleration(body_system);
 
-    update_velocity(body_system, tree, step_size_days);
+    update_velocity(body_system, step_size_days);
 
     std::swap(body_system.acceleration, body_system.old_acceleration);
   }
