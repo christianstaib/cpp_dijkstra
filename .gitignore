@@ -54,3 +54,7 @@ CMakeUserPresets.json
 *.json
 *.mp4
 data/
+
+*.data
+*.old
+*.html
