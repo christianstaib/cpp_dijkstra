@@ -48,11 +48,11 @@ void naive_calculations::update_acceleration(space::BodySystem &body_system) {
       distance_vector = body_system.position[j] - body_system.position[i];
       squared_distance = glm::length2(distance_vector) + constants::squared_softening_factor;
       // x*sqrt(x) should be faster than pow(x, 3/2)
-      body_system.acceleration[i] +=
+      body_system.acceleration_next_timestep[i] +=
           (body_system.mass[j] * distance_vector) / (squared_distance * sqrt(squared_distance));
     }
 
-    body_system.acceleration[i] *= constants::gravitational_constant_in_au3_per_kg_d2;
+    body_system.acceleration_next_timestep[i] *= constants::gravitational_constant_in_au3_per_kg_d2;
   }
 }
 

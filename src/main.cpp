@@ -65,8 +65,8 @@ void update_positions(space::BodySystem &body_system, double time_step) {
 
 #pragma omp for simd schedule(guided)
     for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
-      body_system.position[body_idx] += body_system.velocity[body_idx] * time_step +
-                                        0.5 * body_system.old_acceleration[body_idx] * time_step * time_step;
+      body_system.position[body_idx] +=
+          body_system.velocity[body_idx] * time_step + 0.5 * body_system.acceleration[body_idx] * time_step * time_step;
 
       local_min_edge = min(local_min_edge, body_system.position[body_idx]);
       local_max_edge = max(local_max_edge, body_system.position[body_idx]);
@@ -84,7 +84,8 @@ void update_positions(space::BodySystem &body_system, double time_step) {
 void update_acceleration(space::BodySystem &body_system, octree::Octree &tree, double squared_theta) {
 #pragma omp parallel for simd schedule(guided)
   for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
-    body_system.acceleration[body_idx] = tree.get_acceleration(body_system.position[body_idx], squared_theta);
+    body_system.acceleration_next_timestep[body_idx] =
+        tree.get_acceleration(body_system.position[body_idx], squared_theta);
   }
 }
 
@@ -93,7 +94,7 @@ void update_velocity(space::BodySystem &body_system, double step_size_days) {
 #pragma omp parallel for simd
   for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
     body_system.velocity[body_idx] +=
-        0.5 * (body_system.old_acceleration[body_idx] + body_system.acceleration[body_idx]) * step_size_days;
+        0.5 * (body_system.acceleration[body_idx] + body_system.acceleration_next_timestep[body_idx]) * step_size_days;
   }
 }
 
@@ -109,30 +110,15 @@ void rebuild_tree(space::BodySystem &body_system, octree::Octree &tree) {
   tree.propagate();
 }
 
-void init_acceleration(space::BodySystem &body_system, octree::Octree &tree, double squared_theta) {
-  rebuild_tree(body_system, tree);
-#pragma omp parallel for schedule(static)
-  for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
-    body_system.old_acceleration[body_idx] = tree.get_acceleration(body_system.position[body_idx], squared_theta);
-  }
-}
-
 int main(int argc, char **argv) {
+  std::string bodies_file;
   int step_size_hours{1};
   int vis_step_size_hours{24};
   int t_end{1};
   double theta{1.0};
-  std::string bodies_file;
 
   auto app = cli::setup_app(&step_size_hours, &vis_step_size_hours, &t_end, &theta, &bodies_file);
   CLI11_PARSE(*app, argc, argv);
-
-  std::cout << "Working on file: " << bodies_file << "\n";
-  std::cout << "Step size in hours: " << step_size_hours << "\n";
-  std::cout << "Vis step size in hours: " << vis_step_size_hours << "\n";
-  std::cout << "Length of simulation in year: " << t_end << "\n";
-  std::cout << "Barnes-Hut theta: " << theta << "\n";
-  std::cout << "\n";
 
   //
 
@@ -140,7 +126,6 @@ int main(int argc, char **argv) {
   double step_size_days = 1.0 / (24 * step_size_hours);
   size_t num_iterations = int((t_end * 365) / step_size_days);
 
-  // Hide cursor
   std::unique_ptr<indicators::ProgressBar> bar = cli::setup_progressbar(num_iterations);
 
   //
@@ -156,26 +141,31 @@ int main(int argc, char **argv) {
   std::ofstream myfile;
   myfile.open("data/data.txt");
 
-  // octree::Octree tree;
-  // init_acceleration(body_system, tree, squared_theta);
-  naive_calculations::update_acceleration(body_system);
-  std::swap(body_system.acceleration, body_system.old_acceleration);
+  octree::Octree tree;
+  rebuild_tree(body_system, tree);
+  update_acceleration(body_system, tree, squared_theta);
+  // naive_calculations::update_acceleration(body_system);
+  std::swap(body_system.acceleration_next_timestep, body_system.acceleration);
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   for (int iteration = 0; iteration < num_iterations; ++iteration) {
+    // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
+    // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
     bar->tick();
     loging(bodies, body_system, vis_step_size_hours, step_size_days, myfile, iteration, &begin, bar.get());
 
+    // TODO each MPI nodes updates its positions
     update_positions(body_system, step_size_days);
+    // TODO each MPI nodes sends its positions to all other nodes via MPI_Allgather gg
 
     // // No need to send the tree, tree can be build on each node
-    // rebuild_tree(body_system, tree);
-    // update_acceleration(body_system, tree, squared_theta);
-    naive_calculations::update_acceleration(body_system);
+    rebuild_tree(body_system, tree);
+    update_acceleration(body_system, tree, squared_theta);
+    // naive_calculations::update_acceleration(body_system);
 
     update_velocity(body_system, step_size_days);
 
-    std::swap(body_system.acceleration, body_system.old_acceleration);
+    std::swap(body_system.acceleration_next_timestep, body_system.acceleration);
   }
 
   myfile.close();

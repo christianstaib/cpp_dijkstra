@@ -330,8 +330,8 @@ BodySystem::BodySystem(const std::vector<CelestialBody> &bodies)
       mass(new double[num_bodies]),
       position(new glm::dvec3[num_bodies]),
       velocity(new glm::dvec3[num_bodies]),
-      old_acceleration(new glm::dvec3[num_bodies]),
       acceleration(new glm::dvec3[num_bodies]),
+      acceleration_next_timestep(new glm::dvec3[num_bodies]),
       min_edge(std::numeric_limits<double>::max()),
       max_edge(std::numeric_limits<double>::min()) {
   for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
@@ -349,8 +349,8 @@ BodySystem::~BodySystem() {
   delete[] mass;
   delete[] position;
   delete[] velocity;
-  delete[] old_acceleration;
   delete[] acceleration;
+  delete[] acceleration_next_timestep;
 }
 
 }  // namespace space

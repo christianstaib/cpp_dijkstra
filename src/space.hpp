@@ -77,8 +77,8 @@ struct BodySystem {
   double *mass;
   glm::dvec3 *position;
   glm::dvec3 *velocity;
-  glm::dvec3 *old_acceleration;
   glm::dvec3 *acceleration;
+  glm::dvec3 *acceleration_next_timestep;
   glm::dvec3 min_edge;
   glm::dvec3 max_edge;
 
