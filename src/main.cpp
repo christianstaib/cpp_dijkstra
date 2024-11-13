@@ -45,10 +45,10 @@ void loging(std::vector<space::CelestialBody> &bodies, space::BodySystem &body_s
 
     printf("finished %f %%, %f ms per it\n", 100.0 * (float)iteration / (float)num_iterations, ms_per_it);
 
-    double ke = naive_calculations::get_kinetic_energy(body_system.num_bodies, body_system.mass, body_system.velocity);
-    double pe =
-        naive_calculations::get_potential_energy(body_system.num_bodies, body_system.mass, body_system.position);
-    csv_writer::write_data(myfile, body_system.position, bodies);
+    // double ke = naive_calculations::get_kinetic_energy(body_system.num_bodies, body_system.mass,
+    // body_system.velocity); double pe =
+    //     naive_calculations::get_potential_energy(body_system.num_bodies, body_system.mass, body_system.position);
+    // csv_writer::write_data(myfile, body_system.position, bodies);
   }
 }
 
@@ -143,11 +143,10 @@ int main(int argc, char **argv) {
     // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
     // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
     // TODO bar->tick();
-    // if (world_rank == 0) {
-    //   loging(bodies, global_body_system, vis_step_size_hours, step_size_days, myfile, iteration, num_iterations,
-    //   &begin,
-    //          bar.get());
-    // }
+    if (world_rank == 0) {
+      loging(bodies, global_body_system, vis_step_size_hours, step_size_days, myfile, iteration, num_iterations, &begin,
+             bar.get());
+    }
 
     // TODO each MPI nodes updates its positions
     naive_calculations::update_positions(local_body_system, step_size_days);
