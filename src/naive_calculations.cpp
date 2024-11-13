@@ -34,25 +34,26 @@ double naive_calculations::get_potential_energy(size_t num_bodies, double *masse
   return potential_energy;
 }
 
-void naive_calculations::update_acceleration(space::BodySystem &body_system) {
+void naive_calculations::update_acceleration(space::BodySystem &local_body_system,
+                                             space::BodySystem const &global_body_system) {
 #pragma omp parallel for schedule(static)
-  for (size_t i = 0; i < body_system.num_bodies; ++i) {
+  for (size_t i = 0; i < local_body_system.num_bodies; ++i) {
     glm::dvec3 distance_vector;
     double squared_distance;
-    for (size_t j = 0; j < body_system.num_bodies; ++j) {
+    for (size_t j = 0; j < local_body_system.num_bodies; ++j) {
       if (i == j) {
         continue;
       }
 
       // Precompute distance vector
-      distance_vector = body_system.position[j] - body_system.position[i];
+      distance_vector = local_body_system.position[j] - local_body_system.position[i];
       squared_distance = glm::length2(distance_vector) + constants::squared_softening_factor;
       // x*sqrt(x) should be faster than pow(x, 3/2)
-      body_system.acceleration_next_timestep[i] +=
-          (body_system.mass[j] * distance_vector) / (squared_distance * sqrt(squared_distance));
+      local_body_system.acceleration_next_timestep[i] +=
+          (local_body_system.mass[j] * distance_vector) / (squared_distance * sqrt(squared_distance));
     }
 
-    body_system.acceleration_next_timestep[i] *= constants::gravitational_constant_in_au3_per_kg_d2;
+    local_body_system.acceleration_next_timestep[i] *= constants::gravitational_constant_in_au3_per_kg_d2;
   }
 }
 
@@ -91,33 +92,33 @@ glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bod
 
 // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
 // Needs to be run in a parallel section
-void naive_calculations::update_positions(space::BodySystem &body_system, double time_step) {
+void naive_calculations::update_positions(space::BodySystem &local_body_system, double time_step) {
   // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
 #pragma omp parallel
   {
 #pragma omp critical
     {
-      body_system.min_edge = glm::dvec3(std::numeric_limits<double>::max());
-      body_system.max_edge = glm::dvec3(std::numeric_limits<double>::min());
+      local_body_system.min_edge = glm::dvec3(std::numeric_limits<double>::max());
+      local_body_system.max_edge = glm::dvec3(std::numeric_limits<double>::min());
     }
 
     glm::dvec3 local_min_edge = glm::dvec3(std::numeric_limits<double>::max());
     glm::dvec3 local_max_edge = glm::dvec3(std::numeric_limits<double>::min());
 
 #pragma omp for simd schedule(guided)
-    for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
-      body_system.position[body_idx] +=
-          body_system.velocity[body_idx] * time_step + 0.5 * body_system.acceleration[body_idx] * time_step * time_step;
+    for (size_t body_idx = 0; body_idx < local_body_system.num_bodies; ++body_idx) {
+      local_body_system.position[body_idx] += local_body_system.velocity[body_idx] * time_step +
+                                              0.5 * local_body_system.acceleration[body_idx] * time_step * time_step;
 
-      local_min_edge = min(local_min_edge, body_system.position[body_idx]);
-      local_max_edge = max(local_max_edge, body_system.position[body_idx]);
+      local_min_edge = min(local_min_edge, local_body_system.position[body_idx]);
+      local_max_edge = max(local_max_edge, local_body_system.position[body_idx]);
     }
 
     // better use custom reduction?
 #pragma omp critical
     {
-      body_system.min_edge = min(body_system.min_edge, local_min_edge);
-      body_system.max_edge = max(body_system.max_edge, local_max_edge);
+      local_body_system.min_edge = min(local_body_system.min_edge, local_min_edge);
+      local_body_system.max_edge = max(local_body_system.max_edge, local_max_edge);
     }
   }
 }

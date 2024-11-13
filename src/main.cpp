@@ -35,15 +35,15 @@
 #include "space.hpp"
 
 void loging(std::vector<space::CelestialBody> &bodies, space::BodySystem &body_system, int &vis_step_size,
-            double &time_step, std::ofstream &myfile, int &iteration, std::chrono::steady_clock::time_point *begin,
-            indicators::ProgressBar *bar) {
+            double &time_step, std::ofstream &myfile, int &iteration, size_t &num_iterations,
+            std::chrono::steady_clock::time_point *begin, indicators::ProgressBar *bar) {
   if (iteration % vis_step_size == 0) {
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     double ms_per_it =
         ((double)std::chrono::duration_cast<std::chrono::microseconds>(end - *begin).count() / iteration) / 1000.0;
     bar->set_option(indicators::option::PostfixText{std::to_string(ms_per_it) + "ms/it"});
 
-    printf("finished %f %%, %f ms per it\n", (float)iteration, ms_per_it);
+    printf("finished %f %%, %f ms per it\n", 100.0 * (float)iteration / (float)num_iterations, ms_per_it);
 
     double ke = naive_calculations::get_kinetic_energy(body_system.num_bodies, body_system.mass, body_system.velocity);
     double pe =
@@ -126,14 +126,14 @@ int main(int argc, char **argv) {
   std::vector<space::CelestialBody> local_bodies(bodies.begin() + world_rank * chunk_size,
                                                  bodies.begin() + (world_rank + 1) * chunk_size);
   space::BodySystem local_body_system(local_bodies);
-  space::BodySystem global_body_system_debug(bodies);
+  space::BodySystem global_body_system(bodies);
   glm::dvec3 *global_positions = new glm::dvec3[bodies.size()];
 
   std::ofstream myfile;
   myfile.open("data/data.txt");
 
   octree::Octree tree;
-  rebuild_tree(global_body_system_debug, tree);
+  rebuild_tree(global_body_system, tree);
   update_acceleration(local_body_system, tree, squared_theta);
   // naive_calculations::update_acceleration(body_system);
   std::swap(local_body_system.acceleration_next_timestep, local_body_system.acceleration);
@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
     // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
     // TODO bar->tick();
     if (world_rank == 0) {
-      loging(bodies, global_body_system_debug, vis_step_size_hours, step_size_days, myfile, iteration, &begin,
+      loging(bodies, global_body_system, vis_step_size_hours, step_size_days, myfile, iteration, num_iterations, &begin,
              bar.get());
     }
 
@@ -152,13 +152,13 @@ int main(int argc, char **argv) {
     naive_calculations::update_positions(local_body_system, step_size_days);
     // TODO each MPI nodes sends its positions to all other nodes via MPI_Allgather gg
 
-    MPI_Allgather(local_body_system.position, chunk_size * 3, MPI_DOUBLE, global_body_system_debug.position,
-                  chunk_size * 3, MPI_DOUBLE, MPI_COMM_WORLD);
+    MPI_Allgather(local_body_system.position, chunk_size * 3, MPI_DOUBLE, global_body_system.position, chunk_size * 3,
+                  MPI_DOUBLE, MPI_COMM_WORLD);
 
     // // No need to send the tree, tree can be build on each node
-    rebuild_tree(global_body_system_debug, tree);
-    update_acceleration(local_body_system, tree, squared_theta);
-    // naive_calculations::update_acceleration(body_system);
+    // rebuild_tree(global_body_system_debug, tree);
+    // update_acceleration(local_body_system, tree, squared_theta);
+    naive_calculations::update_acceleration(local_body_system, global_body_system);
 
     naive_calculations::update_velocity(local_body_system, step_size_days);
 
