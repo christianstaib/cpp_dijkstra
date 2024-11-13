@@ -1,10 +1,12 @@
 // Your First C++ Program
 
+#include <mpi.h>
 #include <omp.h>
 
 #include <glm/ext/scalar_constants.hpp>
 #include <memory>
 #include <random>
+#include <valarray>
 
 #include "cli.hpp"
 
@@ -41,43 +43,12 @@ void loging(std::vector<space::CelestialBody> &bodies, space::BodySystem &body_s
         ((double)std::chrono::duration_cast<std::chrono::microseconds>(end - *begin).count() / iteration) / 1000.0;
     bar->set_option(indicators::option::PostfixText{std::to_string(ms_per_it) + "ms/it"});
 
+    printf("finished %f %%, %f ms per it\n", (float)iteration, ms_per_it);
+
     double ke = naive_calculations::get_kinetic_energy(body_system.num_bodies, body_system.mass, body_system.velocity);
     double pe =
         naive_calculations::get_potential_energy(body_system.num_bodies, body_system.mass, body_system.position);
     csv_writer::write_data(myfile, body_system.position, bodies);
-  }
-}
-
-// x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
-// Needs to be run in a parallel section
-void update_positions(space::BodySystem &body_system, double time_step) {
-  // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
-#pragma omp parallel
-  {
-#pragma omp critical
-    {
-      body_system.min_edge = glm::dvec3(std::numeric_limits<double>::max());
-      body_system.max_edge = glm::dvec3(std::numeric_limits<double>::min());
-    }
-
-    glm::dvec3 local_min_edge = glm::dvec3(std::numeric_limits<double>::max());
-    glm::dvec3 local_max_edge = glm::dvec3(std::numeric_limits<double>::min());
-
-#pragma omp for simd schedule(guided)
-    for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
-      body_system.position[body_idx] +=
-          body_system.velocity[body_idx] * time_step + 0.5 * body_system.acceleration[body_idx] * time_step * time_step;
-
-      local_min_edge = min(local_min_edge, body_system.position[body_idx]);
-      local_max_edge = max(local_max_edge, body_system.position[body_idx]);
-    }
-
-    // better use custom reduction?
-#pragma omp critical
-    {
-      body_system.min_edge = min(body_system.min_edge, local_min_edge);
-      body_system.max_edge = max(body_system.max_edge, local_max_edge);
-    }
   }
 }
 
@@ -86,15 +57,6 @@ void update_acceleration(space::BodySystem &body_system, octree::Octree &tree, d
   for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
     body_system.acceleration_next_timestep[body_idx] =
         tree.get_acceleration(body_system.position[body_idx], squared_theta);
-  }
-}
-
-// v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
-void update_velocity(space::BodySystem &body_system, double step_size_days) {
-#pragma omp parallel for simd
-  for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
-    body_system.velocity[body_idx] +=
-        0.5 * (body_system.acceleration[body_idx] + body_system.acceleration_next_timestep[body_idx]) * step_size_days;
   }
 }
 
@@ -126,8 +88,28 @@ int main(int argc, char **argv) {
   double step_size_days = 1.0 / (24 * step_size_hours);
   size_t num_iterations = int((t_end * 365) / step_size_days);
 
-  std::unique_ptr<indicators::ProgressBar> bar = cli::setup_progressbar(num_iterations);
+  //
+  //
+  // Initialize the MPI environment
+  MPI_Init(NULL, NULL);
 
+  // Get the number of processes
+  int world_size;
+  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+  // Get the rank of the process
+  int world_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+  // Get the name of the processor
+  char processor_name[MPI_MAX_PROCESSOR_NAME];
+  int name_len;
+  MPI_Get_processor_name(processor_name, &name_len);
+
+  // Print off a hello world message
+  printf("Hello world from processor %s, rank %d out of %d processors\n", processor_name, world_rank, world_size);
+
+  std::unique_ptr<indicators::ProgressBar> bar = cli::setup_progressbar(num_iterations);
   //
 
   std::vector<space::CelestialBody> bodies = space::read_bodies(bodies_file);
@@ -135,37 +117,52 @@ int main(int argc, char **argv) {
   auto rng = std::default_random_engine{};
   std::shuffle(std::begin(bodies), std::end(bodies), rng);
 
+  printf("len of bodies is %zu\n", bodies.size());
+
+  size_t chunk_size = bodies.size() / world_size;
+
   // setup
-  space::BodySystem body_system(bodies);
+
+  std::vector<space::CelestialBody> local_bodies(bodies.begin() + world_rank * chunk_size,
+                                                 bodies.begin() + (world_rank + 1) * chunk_size);
+  space::BodySystem local_body_system(local_bodies);
+  space::BodySystem global_body_system_debug(bodies);
+  glm::dvec3 *global_positions = new glm::dvec3[bodies.size()];
 
   std::ofstream myfile;
   myfile.open("data/data.txt");
 
   octree::Octree tree;
-  rebuild_tree(body_system, tree);
-  update_acceleration(body_system, tree, squared_theta);
+  rebuild_tree(global_body_system_debug, tree);
+  update_acceleration(local_body_system, tree, squared_theta);
   // naive_calculations::update_acceleration(body_system);
-  std::swap(body_system.acceleration_next_timestep, body_system.acceleration);
+  std::swap(local_body_system.acceleration_next_timestep, local_body_system.acceleration);
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   for (int iteration = 0; iteration < num_iterations; ++iteration) {
     // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
     // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
-    bar->tick();
-    loging(bodies, body_system, vis_step_size_hours, step_size_days, myfile, iteration, &begin, bar.get());
+    // TODO bar->tick();
+    if (world_rank == 0) {
+      loging(bodies, global_body_system_debug, vis_step_size_hours, step_size_days, myfile, iteration, &begin,
+             bar.get());
+    }
 
     // TODO each MPI nodes updates its positions
-    update_positions(body_system, step_size_days);
+    naive_calculations::update_positions(local_body_system, step_size_days);
     // TODO each MPI nodes sends its positions to all other nodes via MPI_Allgather gg
 
+    MPI_Allgather(local_body_system.position, chunk_size * 3, MPI_DOUBLE, global_body_system_debug.position,
+                  chunk_size * 3, MPI_DOUBLE, MPI_COMM_WORLD);
+
     // // No need to send the tree, tree can be build on each node
-    rebuild_tree(body_system, tree);
-    update_acceleration(body_system, tree, squared_theta);
+    rebuild_tree(global_body_system_debug, tree);
+    update_acceleration(local_body_system, tree, squared_theta);
     // naive_calculations::update_acceleration(body_system);
 
-    update_velocity(body_system, step_size_days);
+    naive_calculations::update_velocity(local_body_system, step_size_days);
 
-    std::swap(body_system.acceleration_next_timestep, body_system.acceleration);
+    std::swap(local_body_system.acceleration_next_timestep, local_body_system.acceleration);
   }
 
   myfile.close();

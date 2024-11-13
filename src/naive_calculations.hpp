@@ -15,4 +15,9 @@ void update_acceleration(space::BodySystem &body_system);
 
 glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bodies, glm::dvec3 *positions,
                                       double *masses);
+
+void update_positions(space::BodySystem &body_system, double time_step);
+
+void update_velocity(space::BodySystem &body_system, double step_size_days);
+
 }  // namespace naive_calculations

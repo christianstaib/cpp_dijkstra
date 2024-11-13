@@ -88,3 +88,45 @@ glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bod
   // multipling once at the end is faster and also better for precision
   return force;
 }
+
+// x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
+// Needs to be run in a parallel section
+void naive_calculations::update_positions(space::BodySystem &body_system, double time_step) {
+  // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
+#pragma omp parallel
+  {
+#pragma omp critical
+    {
+      body_system.min_edge = glm::dvec3(std::numeric_limits<double>::max());
+      body_system.max_edge = glm::dvec3(std::numeric_limits<double>::min());
+    }
+
+    glm::dvec3 local_min_edge = glm::dvec3(std::numeric_limits<double>::max());
+    glm::dvec3 local_max_edge = glm::dvec3(std::numeric_limits<double>::min());
+
+#pragma omp for simd schedule(guided)
+    for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
+      body_system.position[body_idx] +=
+          body_system.velocity[body_idx] * time_step + 0.5 * body_system.acceleration[body_idx] * time_step * time_step;
+
+      local_min_edge = min(local_min_edge, body_system.position[body_idx]);
+      local_max_edge = max(local_max_edge, body_system.position[body_idx]);
+    }
+
+    // better use custom reduction?
+#pragma omp critical
+    {
+      body_system.min_edge = min(body_system.min_edge, local_min_edge);
+      body_system.max_edge = max(body_system.max_edge, local_max_edge);
+    }
+  }
+}
+
+// v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
+void naive_calculations::update_velocity(space::BodySystem &body_system, double step_size_days) {
+#pragma omp parallel for simd
+  for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
+    body_system.velocity[body_idx] +=
+        0.5 * (body_system.acceleration[body_idx] + body_system.acceleration_next_timestep[body_idx]) * step_size_days;
+  }
+}
