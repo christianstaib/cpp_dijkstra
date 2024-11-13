@@ -127,7 +127,6 @@ int main(int argc, char **argv) {
                                                  bodies.begin() + (world_rank + 1) * chunk_size);
   space::BodySystem local_body_system(local_bodies);
   space::BodySystem global_body_system(bodies);
-  glm::dvec3 *global_positions = new glm::dvec3[bodies.size()];
 
   std::ofstream myfile;
   myfile.open("data/data.txt");
