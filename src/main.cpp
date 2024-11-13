@@ -48,7 +48,7 @@ void loging(std::vector<space::CelestialBody> &bodies, space::BodySystem &body_s
     // double ke = naive_calculations::get_kinetic_energy(body_system.num_bodies, body_system.mass,
     // body_system.velocity); double pe =
     //     naive_calculations::get_potential_energy(body_system.num_bodies, body_system.mass, body_system.position);
-    // csv_writer::write_data(myfile, body_system.position, bodies);
+    csv_writer::write_data(myfile, body_system.position, bodies);
   }
 }
 
@@ -156,9 +156,9 @@ int main(int argc, char **argv) {
                   MPI_DOUBLE, MPI_COMM_WORLD);
 
     // // No need to send the tree, tree can be build on each node
-    rebuild_tree(global_body_system, tree);
-    update_acceleration(local_body_system, tree, squared_theta);
-    // naive_calculations::update_acceleration(local_body_system, global_body_system);
+    // rebuild_tree(global_body_system, tree);
+    // update_acceleration(local_body_system, tree, squared_theta);
+    naive_calculations::update_acceleration(local_body_system, global_body_system);
 
     naive_calculations::update_velocity(local_body_system, step_size_days);
 
