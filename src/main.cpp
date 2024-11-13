@@ -143,10 +143,11 @@ int main(int argc, char **argv) {
     // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
     // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
     // TODO bar->tick();
-    if (world_rank == 0) {
-      loging(bodies, global_body_system, vis_step_size_hours, step_size_days, myfile, iteration, num_iterations, &begin,
-             bar.get());
-    }
+    // if (world_rank == 0) {
+    //   loging(bodies, global_body_system, vis_step_size_hours, step_size_days, myfile, iteration, num_iterations,
+    //   &begin,
+    //          bar.get());
+    // }
 
     // TODO each MPI nodes updates its positions
     naive_calculations::update_positions(local_body_system, step_size_days);
