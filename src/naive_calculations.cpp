@@ -44,13 +44,13 @@ void naive_calculations::update_acceleration(space::BodySystem &local_body_syste
     double squared_distance;
     for (size_t global_idx = 0; global_idx < global_body_system.num_bodies; ++global_idx) {
       // Precompute distance vector
-      distance_vector = local_body_system.position[global_idx] - local_body_system.position[local_idx];
+      distance_vector = global_body_system.position[global_idx] - local_body_system.position[local_idx];
       squared_distance = glm::length2(distance_vector);
-      squared_distance += constants::squared_softening_factor;
-      // x*sqrt(x) should be faster than pow(x, 3/2)
-      glm::dvec3 test =
-          (local_body_system.mass[global_idx] * distance_vector) / (squared_distance * sqrt(squared_distance));
-      if (!std::isnan(test.x)) {
+      if (squared_distance != 0.0) {
+        squared_distance += constants::squared_softening_factor;
+        // x*sqrt(x) should be faster than pow(x, 3/2)
+        glm::dvec3 test =
+            (global_body_system.mass[global_idx] * distance_vector) / (squared_distance * sqrt(squared_distance));
         local_body_system.acceleration_next_timestep[local_idx] += test;
       }
     }
