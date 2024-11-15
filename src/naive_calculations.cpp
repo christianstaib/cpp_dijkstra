@@ -96,14 +96,11 @@ glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bod
 // Needs to be run in a parallel section
 void naive_calculations::update_positions(space::BodySystem &local_body_system, double time_step) {
   // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
+  local_body_system.min_edge = glm::dvec3(std::numeric_limits<double>::max());
+  local_body_system.max_edge = glm::dvec3(std::numeric_limits<double>::min());
+
 #pragma omp parallel
   {
-#pragma omp critical
-    {
-      local_body_system.min_edge = glm::dvec3(std::numeric_limits<double>::max());
-      local_body_system.max_edge = glm::dvec3(std::numeric_limits<double>::min());
-    }
-
     glm::dvec3 local_min_edge = glm::dvec3(std::numeric_limits<double>::max());
     glm::dvec3 local_max_edge = glm::dvec3(std::numeric_limits<double>::min());
 
@@ -116,7 +113,6 @@ void naive_calculations::update_positions(space::BodySystem &local_body_system, 
       local_max_edge = max(local_max_edge, local_body_system.position[body_idx]);
     }
 
-    // better use custom reduction?
 #pragma omp critical
     {
       local_body_system.min_edge = min(local_body_system.min_edge, local_min_edge);
