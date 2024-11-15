@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
   std::string bodies_file;
   int step_size_hours{1};
   int vis_step_size_hours{24};
-  int t_end{1};
+  int t_end{12};
   double theta{1.05};
 
   auto app = cli::setup_app(&step_size_hours, &vis_step_size_hours, &t_end, &theta, &bodies_file);
