@@ -38,7 +38,7 @@ double naive_calculations::get_potential_energy(size_t num_bodies, double *masse
 
 void naive_calculations::update_acceleration(space::BodySystem &local_body_system,
                                              space::BodySystem const &global_body_system) {
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(guided)
   for (size_t local_idx = 0; local_idx < local_body_system.num_bodies; ++local_idx) {
     glm::dvec3 distance_vector;
     double squared_distance;
@@ -127,7 +127,7 @@ void naive_calculations::update_positions(space::BodySystem &local_body_system, 
 
 // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
 void naive_calculations::update_velocity(space::BodySystem &body_system, double step_size_days) {
-#pragma omp parallel for simd
+#pragma omp parallel for schedule(guided)
   for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
     body_system.velocity[body_idx] +=
         0.5 * (body_system.acceleration[body_idx] + body_system.acceleration_next_timestep[body_idx]) * step_size_days;
