@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
   int step_size_hours{1};
   int vis_step_size_hours{24};
   int t_end{1};
-  double theta{1.0};
+  double theta{1.05};
 
   auto app = cli::setup_app(&step_size_hours, &vis_step_size_hours, &t_end, &theta, &bodies_file);
   CLI11_PARSE(*app, argc, argv);
@@ -152,9 +152,9 @@ int main(int argc, char **argv) {
                   MPI_DOUBLE, MPI_COMM_WORLD);
 
     // // No need to send the tree, tree can be build on each node
-    // rebuild_tree(global_body_system, tree);
-    // update_acceleration(local_body_system, tree, squared_theta);
-    naive_calculations::update_acceleration(local_body_system, global_body_system, chunk_size * world_rank);
+    rebuild_tree(global_body_system, tree);
+    update_acceleration(local_body_system, tree, squared_theta);
+    // naive_calculations::update_acceleration(local_body_system, global_body_system, chunk_size * world_rank);
 
     naive_calculations::update_velocity(local_body_system, step_size_days);
 
