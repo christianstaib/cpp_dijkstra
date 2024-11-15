@@ -48,7 +48,7 @@ void loging(std::vector<space::CelestialBody> &bodies, space::BodySystem &body_s
     // double ke = naive_calculations::get_kinetic_energy(body_system.num_bodies, body_system.mass,
     // body_system.velocity); double pe =
     //     naive_calculations::get_potential_energy(body_system.num_bodies, body_system.mass, body_system.position);
-    csv_writer::write_data(myfile, body_system.position, bodies);
+    // csv_writer::write_data(myfile, body_system.position, bodies);
   }
 }
 
