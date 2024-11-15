@@ -37,22 +37,24 @@ double naive_calculations::get_potential_energy(size_t num_bodies, double *masse
 }
 
 void naive_calculations::update_acceleration(space::BodySystem &local_body_system,
-                                             space::BodySystem const &global_body_system) {
+                                             space::BodySystem const &global_body_system, size_t local_offset) {
 #pragma omp parallel for schedule(guided)
   for (size_t local_idx = 0; local_idx < local_body_system.num_bodies; ++local_idx) {
     glm::dvec3 distance_vector;
     double squared_distance;
     for (size_t global_idx = 0; global_idx < global_body_system.num_bodies; ++global_idx) {
+      if (local_offset + local_idx == global_idx) {
+        continue;
+      }
+
       // Precompute distance vector
       distance_vector = global_body_system.position[global_idx] - local_body_system.position[local_idx];
       squared_distance = glm::length2(distance_vector);
-      if (squared_distance != 0.0) {
-        squared_distance += constants::squared_softening_factor;
-        // x*sqrt(x) should be faster than pow(x, 3/2)
-        glm::dvec3 test =
-            (global_body_system.mass[global_idx] * distance_vector) / (squared_distance * sqrt(squared_distance));
-        local_body_system.acceleration_next_timestep[local_idx] += test;
-      }
+      squared_distance += constants::squared_softening_factor;
+      // x*sqrt(x) should be faster than pow(x, 3/2)
+      glm::dvec3 test =
+          (global_body_system.mass[global_idx] * distance_vector) / (squared_distance * sqrt(squared_distance));
+      local_body_system.acceleration_next_timestep[local_idx] += test;
     }
 
     local_body_system.acceleration_next_timestep[local_idx] *= constants::gravitational_constant_in_au3_per_kg_d2;
