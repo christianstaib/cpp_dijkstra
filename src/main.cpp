@@ -152,9 +152,9 @@ int main(int argc, char **argv) {
                   MPI_DOUBLE, MPI_COMM_WORLD);
 
     // // No need to send the tree, tree can be build on each node
-    rebuild_tree(global_body_system, tree);
-    update_acceleration(local_body_system, tree, squared_theta);
-    // naive_calculations::update_acceleration(local_body_system, global_body_system, chunk_size * world_rank);
+    // rebuild_tree(global_body_system, tree);
+    // update_acceleration(local_body_system, tree, squared_theta);
+    naive_calculations::update_acceleration(local_body_system, global_body_system, chunk_size * world_rank);
 
     naive_calculations::update_velocity(local_body_system, step_size_days);
 
