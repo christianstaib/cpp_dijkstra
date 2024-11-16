@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
     naive_calculations::update_positions(system, step_size_days);
 
     // MPI_IN_PLACE
-    // MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, system.position, chunk_size * 3, MPI_DOUBLE, MPI_COMM_WORLD);
+    MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, system.position, chunk_size * 3, MPI_DOUBLE, MPI_COMM_WORLD);
     // MPI_Allgather(system.position, chunk_size * 3, MPI_DOUBLE, system.position, chunk_size * 3, MPI_DOUBLE,
     //               MPI_COMM_WORLD);
     // TODO MPI_Reduce min_edge
