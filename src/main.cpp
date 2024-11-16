@@ -133,6 +133,7 @@ int main(int argc, char **argv) {
   // setup
 
   space::MpiBodySystem system(bodies, world_size, world_rank);
+  printf("offset is %zu and num dynamic is %zu\n", system.offset_dynamic_bodies, system.num_dynamic_bodies);
 
   std::ofstream myfile;
   myfile.open("data/data.txt");
@@ -154,14 +155,14 @@ int main(int argc, char **argv) {
     naive_calculations::update_positions(system, step_size_days);
 
     // MPI_IN_PLACE
-    MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, system.position, chunk_size * 3, MPI_DOUBLE, MPI_COMM_WORLD);
+    // MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, system.position, chunk_size * 3, MPI_DOUBLE, MPI_COMM_WORLD);
     // MPI_Allgather(system.position, chunk_size * 3, MPI_DOUBLE, system.position, chunk_size * 3, MPI_DOUBLE,
     //               MPI_COMM_WORLD);
     // TODO MPI_Reduce min_edge
     // TODO MPI_Reduce max_edge
 
     // // No need to send the tree, tree can be build on each node
-    // rebuild_tree(global_body_system, tree);
+    // rebuild_tree(system, tree);
     // update_acceleration(local_body_system, tree, squared_theta);
     naive_calculations::update_acceleration(system);
 
