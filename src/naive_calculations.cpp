@@ -40,6 +40,7 @@ double naive_calculations::get_potential_energy(size_t num_bodies, double *masse
 void naive_calculations::update_acceleration(space::MpiBodySystem &system) {
 #pragma omp parallel for schedule(guided)
   for (size_t dyn_to_update_idx = 0; dyn_to_update_idx < system.num_dynamic_bodies; ++dyn_to_update_idx) {
+    system.acceleration_next_timestep[dyn_to_update_idx] = glm::dvec3(0.0);
     glm::dvec3 distance_vector;
     double squared_distance;
 
