@@ -1,6 +1,7 @@
 #include "naive_calculations.hpp"
 
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <glm/fwd.hpp>
 #include <glm/gtx/norm.hpp>
@@ -36,70 +37,35 @@ double naive_calculations::get_potential_energy(size_t num_bodies, double *masse
   return potential_energy;
 }
 
-void naive_calculations::update_acceleration(space::BodySystem &local_body_system,
-                                             space::BodySystem const &global_body_system, size_t local_offset) {
+void naive_calculations::update_acceleration(space::MpiBodySystem &system) {
 #pragma omp parallel for schedule(guided)
-  for (size_t local_idx = 0; local_idx < local_body_system.num_bodies; ++local_idx) {
+  for (size_t dyn_to_update_idx = 0; dyn_to_update_idx < system.num_dynamic_bodies; ++dyn_to_update_idx) {
     glm::dvec3 distance_vector;
     double squared_distance;
-    for (size_t global_idx = 0; global_idx < global_body_system.num_bodies; ++global_idx) {
-      if (local_offset + local_idx == global_idx) {
+
+    for (size_t static_idx = 0; static_idx < system.num_static_bodies; ++static_idx) {
+      size_t static_to_update_idx = dyn_to_update_idx + system.offset_dynamic_bodies;
+      if (static_to_update_idx == static_idx) {
         continue;
       }
 
       // Precompute distance vector
-      distance_vector = global_body_system.position[global_idx] - local_body_system.position[local_idx];
+      distance_vector = system.position[static_idx] - system.position[static_to_update_idx];
       squared_distance = glm::length2(distance_vector);
       squared_distance += constants::squared_softening_factor;
       // x*sqrt(x) should be faster than pow(x, 3/2)
-      glm::dvec3 test =
-          (global_body_system.mass[global_idx] * distance_vector) / (squared_distance * sqrt(squared_distance));
-      local_body_system.acceleration_next_timestep[local_idx] += test;
+      glm::dvec3 test = (system.mass[static_idx] * distance_vector) / (squared_distance * sqrt(squared_distance));
+      system.acceleration_next_timestep[dyn_to_update_idx] += test;
     }
 
-    local_body_system.acceleration_next_timestep[local_idx] *= constants::gravitational_constant_in_au3_per_kg_d2;
+    system.acceleration_next_timestep[dyn_to_update_idx] *= constants::gravitational_constant_in_au3_per_kg_d2;
   }
-}
-
-/// Naive approach to get gravitional force on all bodies in (Kg*AU)/d^2.
-glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bodies, glm::dvec3 *positions,
-                                      double *masses) {
-  long double x = 0;
-  long double y = 0;
-  long double z = 0;
-
-  glm::dvec3 distance_vector;
-  double squared_distance;
-
-  for (size_t j = 0; j < num_bodies; ++j) {
-    // Check body_idx_want_force == j can be skiped as distance_vector will be
-    // zero in this case
-
-    // Precompute distance vector
-    distance_vector = positions[j] - positions[body_idx_want_force];
-    squared_distance = glm::length2(distance_vector) + constants::squared_softening_factor;
-    // x*sqrt(x) should be faster than pow(x, 3/2)
-    x += (masses[j] * distance_vector.x) / (squared_distance * sqrt(squared_distance));
-    y += (masses[j] * distance_vector.y) / (squared_distance * sqrt(squared_distance));
-    z += (masses[j] * distance_vector.z) / (squared_distance * sqrt(squared_distance));
-  }
-
-  x *= constants::gravitational_constant_in_au3_per_kg_d2;
-  y *= constants::gravitational_constant_in_au3_per_kg_d2;
-  z *= constants::gravitational_constant_in_au3_per_kg_d2;
-
-  glm::dvec3 force(x, y, z);
-
-  // multipling once at the end is faster and also better for precision
-  return force;
 }
 
 // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
-// Needs to be run in a parallel section
-void naive_calculations::update_positions(space::BodySystem &local_body_system, double time_step) {
-  // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
-  local_body_system.min_edge = glm::dvec3(std::numeric_limits<double>::max());
-  local_body_system.max_edge = glm::dvec3(std::numeric_limits<double>::min());
+void naive_calculations::update_positions(space::MpiBodySystem &system, double step_size_days) {
+  system.min_edge = glm::dvec3(std::numeric_limits<double>::max());
+  system.max_edge = glm::dvec3(std::numeric_limits<double>::min());
 
 #pragma omp parallel
   {
@@ -107,27 +73,29 @@ void naive_calculations::update_positions(space::BodySystem &local_body_system, 
     glm::dvec3 local_max_edge = glm::dvec3(std::numeric_limits<double>::min());
 
 #pragma omp for simd schedule(guided)
-    for (size_t body_idx = 0; body_idx < local_body_system.num_bodies; ++body_idx) {
-      local_body_system.position[body_idx] += local_body_system.velocity[body_idx] * time_step +
-                                              0.5 * local_body_system.acceleration[body_idx] * time_step * time_step;
+    for (size_t dyn_idx = 0; dyn_idx < system.num_dynamic_bodies; ++dyn_idx) {
+      size_t static_idx = dyn_idx + system.offset_dynamic_bodies;
+      system.position[static_idx] += system.velocity[dyn_idx] * step_size_days +
+                                     0.5 * system.acceleration[dyn_idx] * step_size_days * step_size_days;
 
-      local_min_edge = min(local_min_edge, local_body_system.position[body_idx]);
-      local_max_edge = max(local_max_edge, local_body_system.position[body_idx]);
+      local_min_edge = min(local_min_edge, system.position[static_idx]);
+      local_max_edge = max(local_max_edge, system.position[static_idx]);
     }
 
+    // TODO min reduction
 #pragma omp critical
     {
-      local_body_system.min_edge = min(local_body_system.min_edge, local_min_edge);
-      local_body_system.max_edge = max(local_body_system.max_edge, local_max_edge);
+      system.min_edge = min(system.min_edge, local_min_edge);
+      system.max_edge = max(system.max_edge, local_max_edge);
     }
   }
 }
 
 // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
-void naive_calculations::update_velocity(space::BodySystem &body_system, double step_size_days) {
+void naive_calculations::update_velocity(space::MpiBodySystem &system, double step_size_days) {
 #pragma omp parallel for schedule(guided)
-  for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
-    body_system.velocity[body_idx] +=
-        0.5 * (body_system.acceleration[body_idx] + body_system.acceleration_next_timestep[body_idx]) * step_size_days;
+  for (size_t dyn_idx = 0; dyn_idx < system.num_dynamic_bodies; ++dyn_idx) {
+    system.velocity[dyn_idx] +=
+        0.5 * (system.acceleration[dyn_idx] + system.acceleration_next_timestep[dyn_idx]) * step_size_days;
   }
 }

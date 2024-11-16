@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <glm/ext/vector_double3.hpp>
 #include <string>
 #include <unordered_map>
@@ -72,21 +73,27 @@ struct DataRow {
 std::vector<space::CelestialBody> read_bodies(std::string path);
 
 // Define a struct for body system data
-struct BodySystem {
-  size_t num_bodies;
+struct MpiBodySystem {
+  // For all bodies, the position and masses are known to all nodes as this is necessary for updating the positions
+  // managed by the node.
+  size_t num_static_bodies;
   double *mass;
   glm::dvec3 *position;
+  glm::dvec3 min_edge;  // element-wise min over all positions
+  glm::dvec3 max_edge;  // element-wise max over all positions
+
+  //  Each node is responsible for a continous subset of bodies.
+  size_t offset_dynamic_bodies;  // node_id * num_dynamic_bodies
+  size_t num_dynamic_bodies;     // num_static_bodies / num_dynamic_bodies = nodes
   glm::dvec3 *velocity;
   glm::dvec3 *acceleration;
   glm::dvec3 *acceleration_next_timestep;
-  glm::dvec3 min_edge;
-  glm::dvec3 max_edge;
 
   // Constructor to initialize the system from a vector of bodies
-  BodySystem(const std::vector<CelestialBody> &bodies);
+  MpiBodySystem(const std::vector<CelestialBody> &bodies, size_t num_procs, size_t rank);
 
   // Destructor to clean up dynamically allocated memory
-  ~BodySystem();
+  ~MpiBodySystem();
 };
 
 }  // namespace space

@@ -34,7 +34,7 @@
 #include "octree.hpp"
 #include "space.hpp"
 
-void loging(std::vector<space::CelestialBody> &bodies, space::BodySystem &body_system, int &vis_step_size,
+void loging(std::vector<space::CelestialBody> &bodies, space::MpiBodySystem &body_system, int &vis_step_size,
             double &time_step, std::ofstream &myfile, int &iteration, size_t &num_iterations,
             std::chrono::steady_clock::time_point *begin, indicators::ProgressBar *bar) {
   if (iteration % vis_step_size == 0) {
@@ -52,21 +52,21 @@ void loging(std::vector<space::CelestialBody> &bodies, space::BodySystem &body_s
   }
 }
 
-void update_acceleration(space::BodySystem &body_system, octree::Octree &tree, double squared_theta) {
-#pragma omp parallel for simd schedule(guided)
-  for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
-    body_system.acceleration_next_timestep[body_idx] =
-        tree.get_acceleration(body_system.position[body_idx], squared_theta);
-  }
-}
+// void update_acceleration(space::MpiBodySystem &system, octree::Octree &tree, double squared_theta) {
+// #pragma omp parallel for simd schedule(guided)
+//   for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
+//     body_system.acceleration_next_timestep[body_idx] =
+//         tree.get_acceleration(body_system.position[body_idx], squared_theta);
+//   }
+// }
 
-void rebuild_tree(space::BodySystem &body_system, octree::Octree &tree) {
+void rebuild_tree(space::MpiBodySystem &body_system, octree::Octree &tree) {
   glm::dvec3 center = (body_system.min_edge + body_system.max_edge) * 0.5;
   glm::dvec3 diff = body_system.max_edge - center;
   double size = std::max(std::max(diff.x, diff.y), diff.z);
 
   tree.clear(center, size);
-  for (size_t body_idx = 0; body_idx < body_system.num_bodies; ++body_idx) {
+  for (size_t body_idx = 0; body_idx < body_system.num_static_bodies; ++body_idx) {
     tree.insert(body_system.position[body_idx], body_system.mass[body_idx]);
   }
   tree.propagate();
@@ -113,6 +113,15 @@ int main(int argc, char **argv) {
   //
 
   std::vector<space::CelestialBody> bodies = space::read_bodies(bodies_file);
+
+  {
+    size_t missing_bodies = bodies.size() % world_size;
+    for (size_t i = 0; i < missing_bodies; ++i) {
+      space::CelestialBody null_body{-1, "", "", 0, glm::dvec3(0.0), glm::dvec3(0.0)};
+      bodies.push_back(null_body);
+    }
+  }
+
   // shfule to break order for better tree inserting performance
   auto rng = std::default_random_engine{};
   std::shuffle(std::begin(bodies), std::end(bodies), rng);
@@ -123,42 +132,42 @@ int main(int argc, char **argv) {
 
   // setup
 
-  std::vector<space::CelestialBody> local_bodies(bodies.begin() + world_rank * chunk_size,
-                                                 bodies.begin() + (world_rank + 1) * chunk_size);
-  space::BodySystem local_body_system(local_bodies);
-  space::BodySystem global_body_system(bodies);
+  space::MpiBodySystem system(bodies, world_size, world_rank);
 
   std::ofstream myfile;
   myfile.open("data/data.txt");
 
-  octree::Octree tree;
-  rebuild_tree(global_body_system, tree);
-  update_acceleration(local_body_system, tree, squared_theta);
-  // naive_calculations::update_acceleration(body_system);
-  std::swap(local_body_system.acceleration_next_timestep, local_body_system.acceleration);
+  // octree::Octree tree;
+  // rebuild_tree(system, tree);
+  // update_acceleration(local_body_system, tree, squared_theta);
+  naive_calculations::update_acceleration(system);
+  std::swap(system.acceleration_next_timestep, system.acceleration);
 
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   for (int iteration = 0; iteration < num_iterations; ++iteration) {
     // x_{i + 1} = x_i + v_i * dt + 0.5 * a_i dt^2
     // v_{i + 1} = v_i + 0.5 (a_i + a_{i + 1}) * dt
     if (world_rank == 0) {
-      loging(bodies, global_body_system, vis_step_size_hours, step_size_days, myfile, iteration, num_iterations, &begin,
-             bar.get());
+      loging(bodies, system, vis_step_size_hours, step_size_days, myfile, iteration, num_iterations, &begin, bar.get());
     }
 
-    naive_calculations::update_positions(local_body_system, step_size_days);
+    naive_calculations::update_positions(system, step_size_days);
 
-    MPI_Allgather(local_body_system.position, chunk_size * 3, MPI_DOUBLE, global_body_system.position, chunk_size * 3,
-                  MPI_DOUBLE, MPI_COMM_WORLD);
+    // MPI_IN_PLACE
+    MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, system.position, chunk_size * 3, MPI_DOUBLE, MPI_COMM_WORLD);
+    // MPI_Allgather(system.position, chunk_size * 3, MPI_DOUBLE, system.position, chunk_size * 3, MPI_DOUBLE,
+    //               MPI_COMM_WORLD);
+    // TODO MPI_Reduce min_edge
+    // TODO MPI_Reduce max_edge
 
     // // No need to send the tree, tree can be build on each node
-    rebuild_tree(global_body_system, tree);
-    update_acceleration(local_body_system, tree, squared_theta);
-    // naive_calculations::update_acceleration(local_body_system, global_body_system, chunk_size * world_rank);
+    // rebuild_tree(global_body_system, tree);
+    // update_acceleration(local_body_system, tree, squared_theta);
+    naive_calculations::update_acceleration(system);
 
-    naive_calculations::update_velocity(local_body_system, step_size_days);
+    naive_calculations::update_velocity(system, step_size_days);
 
-    std::swap(local_body_system.acceleration_next_timestep, local_body_system.acceleration);
+    std::swap(system.acceleration_next_timestep, system.acceleration);
   }
 
   myfile.close();

@@ -13,14 +13,10 @@ double get_kinetic_energy(size_t num_bodies, double *masses, glm::dvec3 *velocit
 
 double get_potential_energy(size_t num_bodies, double *masses, glm::dvec3 *positions);
 
-void update_acceleration(space::BodySystem &local_body_system, space::BodySystem const &global_body_system,
-                         size_t local_offset);
+void update_acceleration(space::MpiBodySystem &system);
 
-glm::dvec3 get_gravitational_force_ld(size_t body_idx_want_force, size_t num_bodies, glm::dvec3 *positions,
-                                      double *masses);
+void update_positions(space::MpiBodySystem &system, double step_size_days);
 
-void update_positions(space::BodySystem &body_system, double time_step);
-
-void update_velocity(space::BodySystem &body_system, double step_size_days);
+void update_velocity(space::MpiBodySystem &system, double step_size_days);
 
 }  // namespace naive_calculations

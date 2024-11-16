@@ -1,6 +1,5 @@
+#include <cstdlib>
 #define GLM_ENABLE_EXPERIMENTAL
-
-#include "space.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -14,6 +13,7 @@
 #include <string>
 
 #include "constants.hpp"
+#include "space.hpp"
 
 namespace space {
 
@@ -325,27 +325,39 @@ std::vector<space::CelestialBody> read_bodies(std::string path) {
 }
 
 // Constructor implementation
-BodySystem::BodySystem(const std::vector<CelestialBody> &bodies)
-    : num_bodies(bodies.size()),
-      mass(new double[num_bodies]),
-      position(new glm::dvec3[num_bodies]),
-      velocity(new glm::dvec3[num_bodies]),
-      acceleration(new glm::dvec3[num_bodies]),
-      acceleration_next_timestep(new glm::dvec3[num_bodies]),
-      min_edge(std::numeric_limits<double>::max()),
-      max_edge(std::numeric_limits<double>::min()) {
-  for (size_t body_idx = 0; body_idx < num_bodies; ++body_idx) {
+MpiBodySystem::MpiBodySystem(const std::vector<CelestialBody> &bodies, size_t num_procs, size_t rank) {
+  num_static_bodies = bodies.size();
+  mass = new double[num_static_bodies];
+  position = new glm::dvec3[num_static_bodies];
+  min_edge = glm::dvec3(std::numeric_limits<double>::max());
+  max_edge = glm::dvec3(std::numeric_limits<double>::min());
+
+  if (num_static_bodies % num_procs != 0) {
+    printf("error\n");
+    exit(0);
+  }
+  num_dynamic_bodies = num_static_bodies / num_procs;
+  offset_dynamic_bodies = num_dynamic_bodies * rank;
+
+  velocity = new glm::dvec3[num_dynamic_bodies];
+  acceleration = new glm::dvec3[num_dynamic_bodies];
+  acceleration_next_timestep = new glm::dvec3[num_dynamic_bodies];
+
+  for (size_t body_idx = 0; body_idx < num_static_bodies; ++body_idx) {
     mass[body_idx] = bodies[body_idx].mass;
     position[body_idx] = bodies[body_idx].pos;
-    velocity[body_idx] = bodies[body_idx].vel;
 
     min_edge = glm::min(min_edge, position[body_idx]);
     max_edge = glm::max(max_edge, position[body_idx]);
   }
+
+  for (size_t body_idx = 0; body_idx < num_dynamic_bodies; ++body_idx) {
+    velocity[body_idx] = bodies[body_idx + offset_dynamic_bodies].vel;
+  }
 }
 
 // Destructor implementation
-BodySystem::~BodySystem() {
+MpiBodySystem::~MpiBodySystem() {
   delete[] mass;
   delete[] position;
   delete[] velocity;
